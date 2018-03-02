@@ -1,0 +1,37 @@
+
+ 
+prometheus_endpoint: 'http://192.168.154.97:9090'
+swarm_endpoint: 'http://192.168.154.97:2375'
+
+logging:
+    version: 1
+    root:
+        level: INFO
+        handlers: [console, file]
+    formatters:
+        simpleFormatter:
+            format: "%(module)s %(asctime)s %(levelname)s %(message)s"
+    handlers:
+        console:
+            class: logging.StreamHandler
+            formatter: simpleFormatter
+            level: DEBUG
+            stream: ext://sys.stdout
+        file:
+            class : logging.FileHandler
+            formatter: simpleFormatter
+            mode: w
+            level: DEBUG
+            filename: policy_keeper.log
+    loggers:
+        pk:
+            propagate: false
+            handlers: [console, file]
+        pk_docker:
+            propagate: false
+            handlers: [console, file]
+        pk_prometheus:
+            propagate: false
+            handlers: [console, file]
+
+

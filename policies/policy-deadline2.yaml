@@ -1,0 +1,23 @@
+
+stack: cqueue
+data:
+  sources:
+    - '192.168.154.97:8090'
+  constants:
+    AET: 30
+    QUEUE: "machinery_tasks"
+    DEADLINE: 1519997400
+  queries:
+    WORKERS: 'abs(ceil(vector({{AET}}/(({{DEADLINE}}-time())/scalar(rabbitmq_queue_messages_persistent{queue="{{QUEUE}}"})))))'
+scaling:
+  nodes: 
+    min: 1
+    max: 5
+    target:
+  services:
+    - name: "worker"
+      min: 1
+      max: 10
+      target: instances = WORKERS
+    
+
