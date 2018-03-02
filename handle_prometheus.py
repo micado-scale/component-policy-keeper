@@ -32,14 +32,15 @@ def evaluate_data_queries(endpoint,policy):
   log.debug("--> Start prometheus query session...")
   if 'query_results' not in policy['data']:
     policy['data']['query_results']=dict()
-  for param,query in policy['data']['queries'].iteritems():
-    try:
-      response = requests.get(endpoint+"/api/v1/query?query="+query).json()
-      log.debug('Prometheus response query "{0}":{1}'.format(query,response))
-      val = extract_value_from_prometheus_response(query,response,dict())
-      policy['data']['query_results'][param]=float(val)
-    except Exception as e:
-      policy['data']['query_results'][param]=None
-      log.exception('Policy Keeper')
+  if 'queries' in policy['data']:
+    for param,query in policy['data']['queries'].iteritems():
+      try:
+        response = requests.get(endpoint+"/api/v1/query?query="+query).json()
+        log.debug('Prometheus response query "{0}":{1}'.format(query,response))
+        val = extract_value_from_prometheus_response(query,response,dict())
+        policy['data']['query_results'][param]=float(val)
+      except Exception as e:
+        policy['data']['query_results'][param]=None
+        log.exception('Policy Keeper')
   log.debug("--> End of prometheus query session.")
 

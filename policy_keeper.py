@@ -14,10 +14,11 @@ config=None
 log=None
 
 def resolve_queries(policy):
-  for param,query in policy['data']['queries'].iteritems():
-    template = jinja2.Template(query)
-    newq = template.render(policy['data']['constants'])
-    policy['data']['queries'][param]=newq
+  if policy['data'].get('queries') and policy['data'].get('constants'):
+    for param,query in policy['data']['queries'].iteritems():
+      template = jinja2.Template(query)
+      newq = template.render(policy['data']['constants'])
+      policy['data']['queries'][param]=newq
 
 def perform_service_scaling(policy):
   for srv in policy['scaling']['services']:
