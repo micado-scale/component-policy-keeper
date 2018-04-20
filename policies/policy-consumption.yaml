@@ -1,0 +1,22 @@
+
+stack: 
+data:
+  sources:
+    - '192.168.154.97:8090'
+  constants:
+    NAME: 'stress-ng'
+  queries:
+    AVGCPULOAD: '100 - (avg (rate(node_cpu{group="worker_cluster",mode="idle"}[60s])) * 100)'
+    AVGWORKERLOAD: 'avg(rate(container_cpu_usage_seconds_total{container_label_com_docker_swarm_service_name="{{NAME}}" }[30s]))*100'
+scaling:
+  nodes: 
+    min: 1
+    max: 5
+    target:
+  services:
+    - name: "stress-ng"
+      min: 1
+      max: 10
+      target: ''
+    
+

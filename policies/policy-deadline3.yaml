@@ -6,25 +6,24 @@ data:
   constants:
     AET: 30
     QUEUE: "machinery_tasks"
-    DEADLINE: 1520237700
+    DEADLINE: 1520604900
     MAX: 10
   queries:
     REMAININGTIME: '{{DEADLINE}}-time()'
     ITEMS: 'rabbitmq_queue_messages_persistent{queue="{{QUEUE}}"}' 
-#    AVGCPULOAD: '100 - (avg (rate(node_cpu{group="worker_cluster",mode="idle"}[60s])) * 100)'
 scaling:
   nodes: 
-    min: 2
+    min: 1
     max: 5
     target:
   services:
     - name: "worker"
       min: 1
       max: 10
-      target: | 
-        if REMAININGTIME>0:
-          instances = ceil(AET/(REMAININGTIME/ITEMS)) if ITEMS>0 else 0
+      target: |
+        if ITEMS>0:
+          instances = ceil(AET/(REMAININGTIME/ITEMS)) if REMAININGTIME>0 else MAX 
         else:
-          instances = MAX if ITEMS>0 else 0
+          instances = 0
     
 
