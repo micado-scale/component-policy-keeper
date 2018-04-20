@@ -4,6 +4,7 @@ import requests
 from ruamel import yaml
 import json
 import handle_docker as dock
+import handle_occopus as occo
 import handle_prometheus as prom
 import jinja2
 import logging
@@ -26,10 +27,25 @@ def perform_service_scaling(policy):
         log.info('Scaling values for service "{0}": min:{1} max:{2} calculated:{3}'
 		.format(srv['name'],srv['min'],srv['max'],srv['instances']))
         srv['instances'] = max(min(int(srv['instances']),int(srv['max'])),int(srv['min']))
-	service_name='{0}_{1}'.format(policy['stack'],srv['name'])
+	if policy.get('stack','') not in [None, '']:
+          service_name='{0}_{1}'.format(policy['stack'],srv['name'])
+        else:
+          service_name='{0}'.format(srv['name'])
         dock.scale_docker_service(config['swarm_endpoint'],service_name,int(srv['instances']))
 
-def perform_policy_evaluation(policy):
+def perform_worker_node_scaling(policy):
+  node = policy['scaling']['nodes']
+  if 'instances' in node:
+    log.info('Scaling values for worker node: min:{0} max:{1} calculated:{2}'
+             .format(node['min'],node['max'],node['instances']))
+    node['instances'] = max(min(int(node['instances']),int(node['max'])),int(node['min']))
+    occo.scale_occopus_worker_node(
+        endpoint=config['occopus_endpoint'],
+        infra_name=config['occopus_infra_name'],
+        worker_name=config['occopus_worker_name'],
+        replicas=node['instances'])
+
+def perform_policy_evaluation_on_docker_services(policy):
    inpvars = dict()
    outvars = ['instances']
    for srv in policy['scaling']['services']:
@@ -43,8 +59,25 @@ def perform_policy_evaluation(policy):
      inpvars['instances'] = srv['instances']
      result = evaluator.evaluate(srv['target'], inpvars, outvars)
      srv['instances']=int(result.get('instances',srv['instances']))
-     log.info('Outcome of policy evaluation:')
+     log.info('Outcome of policy evaluation for SERVICES:')
      log.info('-- instances = {0}'.format(int(srv['instances'])))
+   return
+
+def perform_policy_evaluation_on_worker_nodes(policy):
+   node = policy['scaling']['nodes']
+   inpvars = dict()
+   outvars = ['instances']
+   if 'instances' not in node:
+     node['instances']=node['min']
+   for attrname, attrvalue in policy['data']['query_results'].iteritems():
+     inpvars[attrname]=attrvalue
+   for attrname, attrvalue in policy['data']['constants'].iteritems():
+     inpvars[attrname]=attrvalue
+   inpvars['instances'] = node['instances']
+   result = evaluator.evaluate(node['target'], inpvars, outvars)
+   node['instances']=int(result.get('instances',node['instances']))
+   log.info('Outcome of policy evaluation for NODES:')
+   log.info('-- instances = {0}'.format(int(node['instances'])))
    return
 
 def add_exporters_to_prometheus_config(policy):
@@ -88,7 +121,11 @@ def start(policy):
       log.info('Outcome of evaluating queries:')
       for attrname, attrvalue in policy['data']['query_results'].iteritems():
         log.info('-- "{0}" is "{1}".'.format(attrname,attrvalue))
-      perform_policy_evaluation(policy)
+
+      perform_policy_evaluation_on_worker_nodes(policy)
+      perform_worker_node_scaling(policy)
+
+      perform_policy_evaluation_on_docker_services(policy)
       perform_service_scaling(policy)
     except Exception as e:
       log.exception('Policy Keeper')
@@ -106,8 +143,14 @@ if len(sys.argv)!=2:
   log.error('Argument must be a policy file."')
   sys.exit(1)
 
-with open(sys.argv[1],'r') as f:
-  start(yaml.safe_load(f))
+def load_policy_from_file(policyfile):
+  policy = None
+  with open(policyfile,'r') as f:
+    policy = yaml.safe_load(f)
+  return policy
+
+policy = load_policy_from_file(sys.argv[1])
+start(policy)
 
 
 

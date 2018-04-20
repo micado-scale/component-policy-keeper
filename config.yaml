@@ -2,6 +2,9 @@
  
 prometheus_endpoint: 'http://192.168.154.97:9090'
 swarm_endpoint: 'http://192.168.154.97:2375'
+occopus_endpoint: 'http://localhost:5000'
+occopus_infra_name: 'micado_worker_infra'
+occopus_worker_name: 'worker'
 
 logging:
     version: 1
