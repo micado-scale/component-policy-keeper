@@ -6,12 +6,15 @@ def scale_docker_service(endpoint,service_name,replicas):
     log=logging.getLogger('pk_docker')
     log.info('Scaling docker service "{0}" to {1} replicas.'.format(service_name,replicas))
     client = docker.APIClient(endpoint)
-    version = client.inspect_service(service_name)['Version']['Index']
-    ret = client.update_service(
-        service_name,
-        version,
-        mode={'Replicated': {'Replicas': replicas}},
-        fetch_current_spec=True)
+    try: 
+	version = client.inspect_service(service_name)['Version']['Index']
+	ret = client.update_service(
+            service_name,
+            version,
+            mode={'Replicated': {'Replicas': replicas}},
+            fetch_current_spec=True)
+    except Exception as e:
+        log.exception('Scaling of docker service "{0}" failed:'.format(service_name))
     return
 
 def query_service_network(endpoint, stack_name, service_name):
@@ -36,23 +39,27 @@ def query_service_network(endpoint, stack_name, service_name):
 
 
 def attach_container_to_network(endpoint, container, network_id):
+    log=logging.getLogger('pk_docker')
     client = docker.DockerClient(base_url=endpoint)
     network = client.networks.get(network_id)
     if client.containers.get(container).status == "running":
         network.connect(container)
-        print("The {0} container is connected to the {1} network.".format(container, network.name))
+        log.info('Container "{0}" is connected to network "{1}".'.format(container, network.name))
     else:
-        print("The {0} container is not running.".format(container))
+        log.info('Container "{0}" cannot be connected to network "{1}" as it is not running.'
+                 .format(container,network.name))
     return
 
 def detach_container_from_network(endpoint, container, network_id):
+    log=logging.getLogger('pk_docker')
     client = docker.DockerClient(base_url=client_address, version=client_version)
     network = client.networks.get(network_id)
     if client.containers.get(container).status == "running":
         network.disconnect(container)
-        print("The {0} container is disconnected from the {1} network.".format(container, network.name))
+        log.info('Container "{0}" is disconnected from network "{1}".'.format(container, network.name))
     else:
-        print("The {0} container is not running.".format(container))
+        log.info('Container "{0}" cannot be disconnected from network "{1}" as it is not running.'
+                 .format(container,network.name))
     return
     
 
