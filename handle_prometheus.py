@@ -27,20 +27,53 @@ def extract_value_from_prometheus_response(expression,response,filterdict=dict()
       raise Exception('Unrecognised value in prometheus response for expression \"'+expression+'\": \"'+str(value)+"\"")
   return value[1]
 
-def evaluate_data_queries(endpoint,policy):
+def filter_data_queries_by_target(queries,target):
+  result=dict()
+  for param,query in queries.iteritems():
+    if target.find(param)!= -1:
+      result[param]=query
+
+def evaluate_data_queries_for_nodes(endpoint,policy):
   log=logging.getLogger('pk_prometheus')
-  log.debug("--> Start prometheus query session...")
+  items = dict()
   if 'query_results' not in policy['data']:
     policy['data']['query_results']=dict()
   if 'queries' in policy['data']:
+    target_str = policy.get('scaling',dict()).get('nodes',dict()).get('target','')
     for param,query in policy['data']['queries'].iteritems():
       try:
-        response = requests.get(endpoint+"/api/v1/query?query="+query).json()
-        log.debug('Prometheus response query "{0}":{1}'.format(query,response))
-        val = extract_value_from_prometheus_response(query,response,dict())
-        policy['data']['query_results'][param]=float(val)
+        if target_str is not None and target_str.find(param) != -1:
+          response = requests.get(endpoint+"/api/v1/query?query="+query).json()
+          log.debug('Prometheus response query "{0}":{1}'.format(query,response))
+          val = extract_value_from_prometheus_response(query,response,dict())
+          policy['data']['query_results'][param]=float(val)
+          items[param]=float(val)
       except Exception as e:
         policy['data']['query_results'][param]=None
-        log.exception('Policy Keeper')
-  log.debug("--> End of prometheus query session.")
+        items[param]=None
+        log.warning('Evaluating expression for query "{0}" failed: {1}'.format(param,e.message))
+  return items
+
+def evaluate_data_queries_for_a_service(endpoint,policy,servicename):
+  log=logging.getLogger('pk_prometheus')
+  items = dict()
+  if 'query_results' not in policy['data']:
+    policy['data']['query_results']=dict()
+  if 'queries' in policy['data']:
+    all_services = policy.get('scaling',dict()).get('services',dict())
+    target_service = [ srv for srv in all_services if srv.get('name','')==servicename ]
+    target_str = target_service[0].get('target','') if target_service else ''
+    for param,query in policy['data']['queries'].iteritems():
+      try:
+        if target_str is not None and target_str.find(param) != -1:
+          response = requests.get(endpoint+"/api/v1/query?query="+query).json()
+          log.debug('Prometheus response query "{0}":{1}'.format(query,response))
+          val = extract_value_from_prometheus_response(query,response,dict())
+          policy['data']['query_results'][param]=float(val)
+          items[param]=float(val)
+      except Exception as e:
+        policy['data']['query_results'][param]=None
+        items[param]=None
+        log.warning('Evaluating expression for query "{0}" failed: {1}'.format(param,e.message))
+  return items
 
