@@ -4,7 +4,7 @@ import logging
 
 def scale_docker_service(endpoint,service_name,replicas):
     log=logging.getLogger('pk_docker')
-    log.info('Scaling docker service "{0}" to {1} replicas.'.format(service_name,replicas))
+    log.info('(S) => replicas: {0}'.format(replicas))
     client = docker.APIClient(endpoint)
     try: 
 	version = client.inspect_service(service_name)['Version']['Index']
@@ -14,7 +14,7 @@ def scale_docker_service(endpoint,service_name,replicas):
             mode={'Replicated': {'Replicas': replicas}},
             fetch_current_spec=True)
     except Exception as e:
-        log.exception('Scaling of docker service "{0}" failed:'.format(service_name))
+        log.exception('(S) Scaling of docker service "{0}" failed:'.format(service_name))
     return
 
 def query_service_network(endpoint, stack_name, service_name):

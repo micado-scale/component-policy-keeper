@@ -24,7 +24,7 @@ def resolve_queries(policy):
 def perform_service_scaling(policy,service_name):
   for srv in policy['scaling']['services']:
     if 'instances' in srv and srv['name']==service_name:
-        log.info('Scaling values for service "{0}": min:{1} max:{2} calculated:{3}'
+        log.debug('(S) Scaling values for service "{0}": min:{1} max:{2} calculated:{3}'
 		.format(srv['name'],srv['min'],srv['max'],srv['instances']))
         srv['instances'] = max(min(int(srv['instances']),int(srv['max'])),int(srv['min']))
 	if policy.get('stack','') not in [None, '']:
@@ -36,7 +36,7 @@ def perform_service_scaling(policy,service_name):
 def perform_worker_node_scaling(policy):
   node = policy['scaling']['nodes']
   if 'instances' in node:
-    log.info('Scaling values for worker node: min:{0} max:{1} calculated:{2}'
+    log.debug('(S) Scaling values for worker node: min:{0} max:{1} calculated:{2}'
              .format(node['min'],node['max'],node['instances']))
     node['instances'] = max(min(int(node['instances']),int(node['max'])),int(node['min']))
     occo.scale_occopus_worker_node(
@@ -62,7 +62,7 @@ def perform_policy_evaluation_on_a_docker_service(policy,service_name):
      if srv.get('target','') is not None:
        result = evaluator.evaluate(srv.get('target',''), inpvars, outvars)
        srv['instances']=int(result.get('instances',srv['instances']))
-     log.info('-- instances = {0}'.format(int(srv['instances'])))
+     log.info('(P) => instances: {0}'.format(int(srv['instances'])))
    return
 
 def perform_policy_evaluation_on_worker_nodes(policy):
@@ -79,8 +79,7 @@ def perform_policy_evaluation_on_worker_nodes(policy):
    if node.get('target','') is not None:
      result = evaluator.evaluate(node.get('target',''), inpvars, outvars)
      node['instances']=int(result.get('instances',node['instances']))
-   log.info('Outcome of policy evaluation for NODES:')
-   log.info('-- instances = {0}'.format(int(node['instances'])))
+   log.info('(P) => instances: {0}'.format(int(node['instances'])))
    return
 
 def add_exporters_to_prometheus_config(policy):
@@ -120,31 +119,32 @@ def start(policy):
   attach_prometheus_exporters_network(policy)
   while True:
     try:
-      log.info('Evaluation of queries for nodes starts')
+      log.info('(Q) Query evaluation for nodes starts')
       queries = prom.evaluate_data_queries_for_nodes(config['prometheus_endpoint'],policy)
       if queries:
         for attrname, attrvalue in queries.iteritems():
-          log.info('-- "{0}" is "{1}".'.format(attrname,attrvalue))
+          log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
       
-        log.info('Evaluation of node policies starts')
+        log.info('(P) Policy evaluation for nodes starts')
         perform_policy_evaluation_on_worker_nodes(policy)
+        log.info('(S) Scaling of nodes starts')
         perform_worker_node_scaling(policy)
       else:
-        log.info('No query evaluation performed for nodes, skipping policy evaluation')
+        log.info('(Q) No query evaluation performed for nodes, skipping policy evaluation')
 
       for oneservice in policy.get('scaling',dict()).get('services',dict()):
         service_name=oneservice.get('name')
-        log.info('Evaluation of queries for service "{0}" starts'.format(service_name))
+        log.info('(Q) Query evaluation for service "{0}" starts'.format(service_name))
         queries = prom.evaluate_data_queries_for_a_service(config['prometheus_endpoint'],policy,service_name)
         if queries:
           for attrname, attrvalue in queries.iteritems():
-            log.info('-- "{0}" is "{1}".'.format(attrname,attrvalue))
-          log.info('Evaluation of policies for service "{0}" starts.'.format(service_name))
+            log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
+          log.info('(P) Policy evaluation for service "{0}" starts'.format(service_name))
           perform_policy_evaluation_on_a_docker_service(policy,service_name)
-          log.info('Evaluation of policies for service "{0}" starts.'.format(service_name))
+          log.info('(S) Scaling of service "{0}" starts'.format(service_name))
           perform_service_scaling(policy,service_name)
         else:
-          log.info('No query evaluation performed for service "{0}", skipping policy evaluation'
+          log.info('(Q) No query evaluation performed for service "{0}", skipping policy evaluation'
                    .format(service_name))
 
     except Exception as e:
