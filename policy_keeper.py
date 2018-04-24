@@ -82,41 +82,20 @@ def perform_policy_evaluation_on_worker_nodes(policy):
    log.info('(P) => instances: {0}'.format(int(node['instances'])))
    return
 
-def add_exporters_to_prometheus_config(policy):
-  log.debug("--> Adding exporters to Prometheus config...")
-  for exporter_endpoint in policy.get('data',dict()).get('sources',dict()):
-    try:
-      log.info('Add exporter "{0}" to Prometheus config.'.format(exporter_endpoint))
-      log.warning('Add exporter to Prometheus config is not implemented yet!')
-      '''
-      TODO: add exporter_ednpoint to the config file of prometheus as targets
-      TODO: when each has been added, force prometheus to reload its config
-      '''
-    except Exception as e:
-      log.exception('Policy Keeper')
-  log.debug("--> Finished adding exporters to Prometheus config.")
-  return
-
-def attach_prometheus_exporters_network(policy):
-  log.debug("--> Attaching Prometheus to exporters network...")
-  for exporter_endpoint in policy.get('data',dict()).get('sources',dict()):
-    try:
-      exporter_name=exporter_endpoint.split(':')[0]
-      if '.' not in exporter_name:
-        log.info('Attach prometheus to network of exporter "{0}".'.format(exporter_endpoint))
-        exporter_netid = dock.query_service_network(config['swarm_endpoint'],policy['stack'],exporter_name)
-        if exporter_netid:
-	  dock.attach_container_to_network(config['swarm_endpoint'], 'prometheus', exporter_netid)
-    except Exception as e:
-      log.exception('Policy Keeper')
-  log.debug("--> Finished attaching Prometheus to exporters network.")
-
 def start(policy):
   log.debug("POLICY:")
   log.debug(policy)
   resolve_queries(policy)
-  add_exporters_to_prometheus_config(policy)
-  attach_prometheus_exporters_network(policy)
+  log.info('(C) Add exporters to prometheus configuration file starts')
+  prom.add_exporters_to_prometheus_config(policy,
+                                          config['prometheus_config_template'],
+                                          config['prometheus_config_target'])
+  log.info('(C) Attach prometheus to network of exporters starts')
+  prom.attach_prometheus_exporters_network(policy,
+                                           config['swarm_endpoint'])
+  log.info('(C) Notify prometheus to reload config starts')
+  prom.notify_to_reload_config(config['prometheus_endpoint'])
+
   while True:
     try:
       log.info('(Q) Query evaluation for nodes starts')
