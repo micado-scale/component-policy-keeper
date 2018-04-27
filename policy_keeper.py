@@ -106,9 +106,12 @@ def start(policy_yaml):
   log.info('(C) Attach prometheus to network of exporters starts')
   prom.attach_prometheus_to_exporters_network(policy,
                                            config['swarm_endpoint'])
+  log.info('(C) Add alerts to prometheus, generating rule files starts')
+  prom.deploy_alerts_under_prometheus(config['prometheus_rules_directory'],
+                                      policy.get('data',dict()).get('alerts'),
+                                      policy.get('stack','pk'))
   log.info('(C) Notify prometheus to reload config starts')
   prom.notify_to_reload_config(config['prometheus_endpoint'])
-
   while not pk_config.get_finish_scaling():
     try:
       log.info('(Q) Query evaluation for nodes starts')

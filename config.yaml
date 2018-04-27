@@ -3,6 +3,7 @@
 prometheus_endpoint: 'http://192.168.154.97:9090'
 prometheus_config_template: '/root/original_prometheus_config.yaml'
 prometheus_config_target: '/root/prometheus_config.yaml'
+prometheus_rules_directory: '/root'
 
 swarm_endpoint: 'http://192.168.154.97:2375'
 occopus_endpoint: 'http://localhost:5000'

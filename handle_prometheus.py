@@ -2,7 +2,7 @@ import logging
 import requests
 from ruamel import yaml
 import handle_docker as dock
-import shutil
+import shutil,os
 
 def is_subdict(subdict=dict(),maindict=dict()):
   return all((k in maindict and maindict[k]==v) for k,v in subdict.iteritems())
@@ -167,4 +167,19 @@ def notify_to_reload_config(endpoint):
   except Exception as e:
     log.exception('Sending config reload notification to Prometheus failed:')
 
-  
+def create_rule_file_for_prometheus(rules_directory,alert):
+
+
+  return
+
+def deploy_alerts_under_prometheus(rules_directory,alerts,stack):
+  if not alerts:
+    return
+  log=logging.getLogger('pk_prometheus')
+  content={'groups': [ { 'name': 'micado', 'rules' : [] } ] }
+  for alert in alerts:
+    content['groups'][0]['rules'].append(dict(alert))
+  rule_file=os.path.join(rules_directory,stack+'.rule')
+  with open(rule_file, 'w') as outfile:
+        yaml.round_trip_dump(content, outfile, default_flow_style=False)
+  return

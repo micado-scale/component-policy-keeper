@@ -7,6 +7,13 @@ data:
   queries:
     AVGCPULOAD: '100 - (avg (rate(node_cpu{group="worker_cluster",mode="idle"}[60s])) * 100)'
     AVGWORKERLOAD: 'avg(rate(container_cpu_usage_seconds_total{container_label_com_docker_swarm_service_name="{{NAME}}" }[30s]))*100'
+  alerts:
+    - alert: worker_overloaded
+      expr: '(100-(avg(rate(node_cpu{group="worker_cluster",mode="idle"}[60s]))*100))>60'
+      for: 1m
+    - alert: worker_underloaded
+      expr: '(100-(avg(rate(node_cpu{group="worker_cluster",mode="idle"}[60s]))*100))<20'
+      for: 1m
 scaling:
   nodes: 
     min: 1
