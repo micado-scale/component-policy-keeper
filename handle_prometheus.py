@@ -2,6 +2,7 @@ import logging
 import requests
 from ruamel import yaml
 import handle_docker as dock
+import shutil
 
 def is_subdict(subdict=dict(),maindict=dict()):
   return all((k in maindict and maindict[k]==v) for k,v in subdict.iteritems())
@@ -85,10 +86,10 @@ def evaluate_data_queries_for_a_service(endpoint,policy,servicename):
         log.warning('Evaluating expression for query "{0}" failed: {1}'.format(param,e.message))
   return items
 
-def add_exporters_to_prometheus_config(policy, template, config_file):
+def add_exporters_to_prometheus_config(policy, template_file, config_file):
   log=logging.getLogger('pk_prometheus')
   try:
-    with open(template,'r') as f:
+    with open(template_file,'r') as f:
       config_content = yaml.round_trip_load(f)
       if 'scrape_configs' not in config_content:
         config_content['scrape_configs']=[]
@@ -129,18 +130,34 @@ def add_exporters_to_prometheus_config(policy, template, config_file):
 
   return
 
-def attach_prometheus_exporters_network(policy,swarm_endpoint):
+def remove_exporters_from_prometheus_config(template_file, config_file):
+  shutil.copyfile(template_file, config_file)
+
+def attach_prometheus_to_exporters_network(policy,swarm_endpoint):
   log=logging.getLogger('pk_prometheus')
   for exporter_endpoint in policy.get('data',dict()).get('sources',dict()):
     try:
       exporter_name=exporter_endpoint.split(':')[0]
       if '.' not in exporter_name:
-        log.info('(C) => adding network of exporter "{0}" to prometheus'.format(exporter_endpoint))
+        log.info('(C) => attaching prometheus to network of exporter "{0}"'.format(exporter_endpoint))
         exporter_netid = dock.query_service_network(swarm_endpoint,policy['stack'],exporter_name)
         if exporter_netid:
           dock.attach_container_to_network(swarm_endpoint, 'prometheus', exporter_netid)
     except Exception as e:
       log.exception('Attaching prometheus to network of exporter failed:')
+
+def detach_prometheus_from_exporters_network(policy,swarm_endpoint):
+  log=logging.getLogger('pk_prometheus')
+  for exporter_endpoint in policy.get('data',dict()).get('sources',dict()):
+    try:
+      exporter_name=exporter_endpoint.split(':')[0]
+      if '.' not in exporter_name:
+        log.info('(C) => detaching prometheus from network of exporter "{0}"'.format(exporter_endpoint))
+        exporter_netid = dock.query_service_network(swarm_endpoint,policy['stack'],exporter_name)
+        if exporter_netid:
+          dock.detach_container_from_network(swarm_endpoint, 'prometheus', exporter_netid)
+    except Exception as e:
+      log.exception('Detaching prometheus from network of exporter failed:')
 
 def notify_to_reload_config(endpoint):
   log=logging.getLogger('pk_prometheus')

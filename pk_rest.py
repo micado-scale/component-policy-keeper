@@ -48,7 +48,7 @@ def start_policy():
     raise RequestException(400, 'Policy processing is already running')
   else:
     log.info('Received policy: {0}'.format(policy_yaml))
-    policy_thread = threading.Thread(target=policy_keeper.start,args=(policy_yaml,))
+    policy_thread = threading.Thread(target=policy_keeper.perform_policy_keeping,args=(policy_yaml,))
     policy_thread.start() 
   return jsonify(dict(response='no error'))
 

@@ -29,7 +29,7 @@ logging:
             formatter: simpleFormatter
             mode: w
             level: DEBUG
-            filename: policy_keeper.log
+            filename: pk.log
     loggers:
         pk:
             propagate: false

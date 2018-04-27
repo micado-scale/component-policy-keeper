@@ -1,4 +1,3 @@
-
 stack: cqueue
 data:
   sources:
@@ -22,5 +21,3 @@ scaling:
       min: 2
       max: 10
       target: 'AVGWORKERLOAD'
-    
-

@@ -14,7 +14,7 @@ import argparse
 import pk_rest
 import pk_config
 
-log=None
+log = None
 
 def resolve_queries(policy):
   if policy['data'].get('queries') and policy['data'].get('constants'):
@@ -94,8 +94,8 @@ def load_policy_from_file(policyfile):
 
 def start(policy_yaml):
   global log
-  config = pk_config.get_config()
   log = logging.getLogger('pk')
+  config = pk_config.get_config()
   log.info('Received policy: \n{0}'.format(policy_yaml))
   policy = yaml.safe_load(policy_yaml)
   resolve_queries(policy)
@@ -104,7 +104,7 @@ def start(policy_yaml):
                                           config['prometheus_config_template'],
                                           config['prometheus_config_target'])
   log.info('(C) Attach prometheus to network of exporters starts')
-  prom.attach_prometheus_exporters_network(policy,
+  prom.attach_prometheus_to_exporters_network(policy,
                                            config['swarm_endpoint'])
   log.info('(C) Notify prometheus to reload config starts')
   prom.notify_to_reload_config(config['prometheus_endpoint'])
@@ -139,19 +139,33 @@ def start(policy_yaml):
           log.info('(Q) No query evaluation performed for service "{0}", skipping policy evaluation'
                    .format(service_name))
     except Exception as e:
-      log.exception('Exception occured in Policy Keeper:')
+      log.exception('Exception occured during policy execution:')
     for x in range(15):
       if pk_config.get_finish_scaling():
         break
       time.sleep(1)
   pk_config.set_finish_scaling(False)
 
-def stop():
+def stop(policy_yaml):
   global log
-  log.error("Not implemented yet")
+  log = logging.getLogger('pk')
+  config = pk_config.get_config()
+  policy = yaml.safe_load(policy_yaml)
+  log.info('(C) Remove exporters from prometheus configuration file starts')
+  prom.remove_exporters_from_prometheus_config(config['prometheus_config_template'],
+                                               config['prometheus_config_target'])
+  log.info('(C) Notify prometheus to reload config starts')
+  prom.notify_to_reload_config(config['prometheus_endpoint'])
+  log.info('(C) Detach prometheus from network of exporters starts')
+  prom.detach_prometheus_from_exporters_network(policy,
+                                                config['swarm_endpoint'])
+
+def perform_policy_keeping(policy_yaml):
+  start(policy_yaml)
+  stop(policy_yaml)
 
 def pkmain():
-  log = logging.getLogger('pk')
+  global log
   parser = argparse.ArgumentParser(description='MiCADO component to realise scaling policies')
   parser.add_argument('--cfg',
                       dest='cfg_path',
@@ -171,25 +185,36 @@ def pkmain():
   #print 'POLICY: '+(args.cfg_policy if args.cfg_policy else 'undefined')
   #print 'SRV: '+str(args.cfg_srv) 
  
+  #read configuration
   try:
     with open(args.cfg_path,'r') as c:
       pk_config.set_config(yaml.safe_load(c))
   except Exception as e:
     print 'ERROR: Cannot read configuration file "{0}": {1}'.format(args.cfg_path,str(e))
   config = pk_config.get_config()
+  #initialise logging facility based on the configuration
   try: 
     logging.config.dictConfig(config['logging'])
     log = logging.getLogger('pk')
   except Exception as e:
     print 'ERROR: Cannot process configuration file "{0}": {1}'.format(args.cfg_path,str(e))
 
+  #read policy file and start periodic policy evaluation in case of command-line mode 
   if not args.cfg_srv:
     if not args.cfg_policy:
       log.error('Policy file must be specified for standalone execution!')
       sys.exit(1)
-    policy_yaml = load_policy_from_file(args.cfg_policy)
-    start(policy_yaml)
+    try:
+      policy_yaml = load_policy_from_file(args.cfg_policy)
+      start(policy_yaml)
+    except KeyboardInterrupt: 
+      log.warning('Keyboard interruption detected! Shutting down...')
+      stop(policy_yaml)
+    except Exception:
+      log.exception('An error occured during policy execution:')
+      return
 
+  #launch web service and wait for oncoming requests
   if args.cfg_srv:
     if args.cfg_policy:
       log.warning('Policy file in parameter is unsused, must be defined through the API in service mode!')
