@@ -164,22 +164,31 @@ def notify_to_reload_config(endpoint):
   try:
     requests.post(endpoint+"/-/reload")
     log.info('(C) Notification to reload config sent to Prometheus.')
-  except Exception as e:
+  except Exception:
     log.exception('Sending config reload notification to Prometheus failed:')
-
-def create_rule_file_for_prometheus(rules_directory,alert):
-
-
-  return
 
 def deploy_alerts_under_prometheus(rules_directory,alerts,stack):
   if not alerts:
     return
   log=logging.getLogger('pk_prometheus')
-  content={'groups': [ { 'name': 'micado', 'rules' : [] } ] }
-  for alert in alerts:
-    content['groups'][0]['rules'].append(dict(alert))
-  rule_file=os.path.join(rules_directory,stack+'.rule')
-  with open(rule_file, 'w') as outfile:
-        yaml.round_trip_dump(content, outfile, default_flow_style=False)
+  try:
+    content={'groups': [ { 'name': 'micado', 'rules' : [] } ] }
+    for alert in alerts:
+      content['groups'][0]['rules'].append(dict(alert))
+    rule_file=os.path.join(rules_directory,stack+'.rules')
+    with open(rule_file, 'w') as outfile:
+      yaml.round_trip_dump(content, outfile, default_flow_style=False)
+  except Exception:
+    log.exception('Deploying alerts under Prometheus failed:')
+  return
+
+def remove_alerts_under_prometheus(rules_directory,alerts,stack):
+  if not alerts:
+    return
+  log=logging.getLogger('pk_prometheus')
+  try:
+    rule_file=os.path.join(rules_directory,stack+'.rules')
+    os.remove(rule_file)
+  except Exception:
+    log.exception('Removing alerts under Prometheus failed:')
   return

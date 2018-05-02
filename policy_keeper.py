@@ -157,6 +157,10 @@ def stop(policy_yaml):
   log.info('(C) Remove exporters from prometheus configuration file starts')
   prom.remove_exporters_from_prometheus_config(config['prometheus_config_template'],
                                                config['prometheus_config_target'])
+  log.info('(C) Remove alerts from prometheus, deleting rule files starts')
+  prom.remove_alerts_under_prometheus(config['prometheus_rules_directory'],
+                                      policy.get('data',dict()).get('alerts'),
+                                      policy.get('stack','pk'))
   log.info('(C) Notify prometheus to reload config starts')
   prom.notify_to_reload_config(config['prometheus_endpoint'])
   log.info('(C) Detach prometheus from network of exporters starts')
