@@ -61,5 +61,8 @@ def stop_policy():
     policy_thread = None
   return jsonify(dict(response='no error'))
       
-    
-
+@app.route('/alerts/fire', methods=['POST'])
+def alerts_fire():
+  alert = request.stream.read()
+  log.info('Received alert: {0}'.format(alert))
+  return ''
