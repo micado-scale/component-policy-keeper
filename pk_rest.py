@@ -52,7 +52,8 @@ def eval_policy():
     policy_yaml = pk_config.policy() 
     policy = yaml.safe_load(policy_yaml)
     policy_keeper.resolve_queries(policy)
-    policy_keeper.perform_one_session(policy)
+    results = yaml.safe_load(data_yaml)
+    policy_keeper.perform_one_session(policy, results)
   return jsonify(dict(response='OK'))
 
 @app.route('/policy/set', methods=['POST'])

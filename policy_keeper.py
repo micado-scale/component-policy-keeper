@@ -114,13 +114,38 @@ def prepare_session(policy_yaml):
   prom.notify_to_reload_config(config['prometheus_endpoint'])
   return policy
 
-def perform_one_session(policy):
+def add_query_results_to_nodes(policy, results):
+  queries = dict()
+  policy['data']['query_results']={}
+  target_str = policy.get('scaling',dict()).get('nodes',dict()).get('target','')
+  for attrname, attrvalue in results['data']['queries'].iteritems():
+    if target_str is not None and target_str.find(attrname) != -1:
+      queries[attrname]=attrvalue
+      policy['data']['query_results'][attrname]=attrvalue
+  return queries
+  
+def add_query_results_to_service(policy, results, servicename):
+  queries = dict()
+  policy['data']['query_results']={}
+  all_services = policy.get('scaling',dict()).get('services',dict())
+  target_service = [ srv for srv in all_services if srv.get('name','')==servicename ]
+  target_str = target_service[0].get('target','') if target_service else ''
+  for attrname,attrvalue in results['data']['queries'].iteritems():
+    if target_str is not None and target_str.find(attrname) != -1:
+      queries[attrname]=attrvalue
+      policy['data']['query_results'][attrname]=attrvalue
+  return queries
+
+def perform_one_session(policy, results = None):
   global log
   log = logging.getLogger('pk')
   log.info('(Q) Query evaluation for nodes starts')
   config = pk_config.config()
 
-  queries = prom.evaluate_data_queries_for_nodes(config['prometheus_endpoint'],policy)
+  if results:
+    queries = add_query_results_to_nodes(policy, results)
+  else:
+    queries = prom.evaluate_data_queries_for_nodes(config['prometheus_endpoint'],policy)
   if queries:
     for attrname, attrvalue in queries.iteritems():
       log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
@@ -134,7 +159,10 @@ def perform_one_session(policy):
   for oneservice in policy.get('scaling',dict()).get('services',dict()):
     service_name=oneservice.get('name')
     log.info('(Q) Query evaluation for service "{0}" starts'.format(service_name))
-    queries = prom.evaluate_data_queries_for_a_service(config['prometheus_endpoint'],policy,service_name)
+    if results:
+      queries = add_query_results_to_service(policy, results, service_name)
+    else:
+      queries = prom.evaluate_data_queries_for_a_service(config['prometheus_endpoint'],policy,service_name)
     if queries:
       for attrname, attrvalue in queries.iteritems():
 	log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
