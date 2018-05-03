@@ -4,6 +4,7 @@ import threading
 import policy_keeper
 from ruamel import yaml
 import pk_config
+import handle_prometheus as prom
 
 policy_thread = None
 
@@ -50,7 +51,7 @@ def start_policy():
     log.info('Received policy: {0}'.format(policy_yaml))
     policy_thread = threading.Thread(target=policy_keeper.perform_policy_keeping,args=(policy_yaml,))
     policy_thread.start() 
-  return jsonify(dict(response='no error'))
+  return jsonify(dict(response='OK'))
 
 @app.route('/policy/stop', methods=['POST'])
 def stop_policy():
@@ -59,10 +60,20 @@ def stop_policy():
     pk_config.set_finish_scaling(True)
     policy_thread.join()
     policy_thread = None
-  return jsonify(dict(response='no error'))
+  return jsonify(dict(response='OK'))
       
 @app.route('/alerts/fire', methods=['POST'])
 def alerts_fire():
-  alert = request.stream.read()
-  log.info('Received alert: {0}'.format(alert))
+  alert = yaml.safe_load(request.stream)
+  a = prom.alerts_add(alert)
+  log.info('(A) Alert(s) fired: {0}'.format(a))
   return ''
+
+@app.route('/alerts/reset', methods=['POST'])
+def alerts_init():
+  alert = yaml.safe_load(request.stream)
+  log.info('(A) Resetting alerts based on external request.')
+  prom.alerts_remove(None)
+  return jsonify(dict(response='OK'))
+
+

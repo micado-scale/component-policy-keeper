@@ -1,0 +1,34 @@
+
+Policy keeper REST API:
+
+Start a policy:
+curl -X POST http://localhost:12345/policy/start --data-binary @policy.yaml
+
+Stop a policy:
+curl -X POST http://localhost:12345/policy/stop
+
+Fire an alert:
+curl -X POST http://localhost:12345/alerts/fire --data-binary @alert.yaml
+
+alert.yaml:
+alerts:
+- annotations: {}
+  endsAt: '0001-01-01T00:00:00Z'
+  generatorURL: http://d41870505e27:9090/graph?g0.expr=vector%281.525268017e%2B09+-+time%28%29%29+%3C+0&g0.tab=1
+  labels:
+    alertname: MyAlert
+  startsAt: '2018-05-03T07:41:01.255717752Z'
+  status: firing
+commonAnnotations: {}
+commonLabels:
+  alertname: time_elapsed
+externalURL: http://7c46054c555f:9093
+groupKey: '{}:{alertname="Myalert"}'
+groupLabels:
+  alertname: MyAlert
+receiver: default
+status: firing
+version: '4'
+
+----------------------
+

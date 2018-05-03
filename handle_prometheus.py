@@ -4,6 +4,8 @@ from ruamel import yaml
 import handle_docker as dock
 import shutil,os
 
+alerts = {}
+
 def is_subdict(subdict=dict(),maindict=dict()):
   return all((k in maindict and maindict[k]==v) for k,v in subdict.iteritems())
 
@@ -167,6 +169,10 @@ def notify_to_reload_config(endpoint):
   except Exception:
     log.exception('Sending config reload notification to Prometheus failed:')
 
+'''
+''   Prometheus ALERTING
+'''
+
 def deploy_alerts_under_prometheus(rules_directory,alerts,stack):
   if not alerts:
     return
@@ -192,3 +198,32 @@ def remove_alerts_under_prometheus(rules_directory,alerts,stack):
   except Exception:
     log.exception('Removing alerts under Prometheus failed:')
   return
+
+def alerts_isany():
+  global alerts
+  return True if alerts else False
+
+def alerts_remove(name):
+  global alerts
+  alerts.pop(name,None) if name else alerts.clear()
+
+def alerts_add(alert):
+  global alerts
+  stored_alerts = []
+  for a in alert.get('alerts'):
+    name = a.get('labels',dict()).get('alertname')
+    if a.get('status') != 'firing':
+      continue
+    if name in alerts:
+      log=logging.getLogger('pk_prometheus')
+      log.warning('(A) Alert "{0}" is already among unhandled alerts!'.format(name))
+    alerts[name] = a.get('endsAt')
+    stored_alerts.append(name)
+  return stored_alerts
+
+def alerts_query(name):
+  global alerts
+  if not name:
+    return alerts
+  return alerts[name] if name in alerts else None
+
