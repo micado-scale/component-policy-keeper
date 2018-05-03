@@ -1,10 +1,12 @@
 import docker
 import logging
-
+import pk_config
 
 def scale_docker_service(endpoint,service_name,replicas):
     log=logging.getLogger('pk_docker')
     log.info('(S) => replicas: {0}'.format(replicas))
+    if pk_config.simulate(None):
+      return
     client = docker.APIClient(endpoint)
     try: 
 	version = client.inspect_service(service_name)['Version']['Index']
@@ -22,6 +24,8 @@ def query_service_network(endpoint, stack_name, service_name):
     log=logging.getLogger('pk_docker')
     client = docker.DockerClient(base_url=endpoint)
     full_service_name = stack_name + "_" + service_name
+    if pk_config.simulate(None):
+      return None
     service_list = client.services.list()
     i = 0
     while i < len(service_list) and service_list[i].name != full_service_name:

@@ -1,19 +1,29 @@
 
-config = None
-finish_scaling = False
+var_config = None
+var_policy = None
+var_finish_scaling = False
+var_simulate = False
 
-def set_config(newconfig):
-  global config
-  config = newconfig
+def config(nc = None):
+  global var_config
+  if nc is not None:
+    var_config = nc
+  return var_config
 
-def get_config():
-  global config
-  return config
+def finish_scaling(fs = None):
+  global var_finish_scaling
+  if fs is not None:
+    var_finish_scaling = fs
+  return var_finish_scaling
 
-def set_finish_scaling(fs):
-  global finish_scaling
-  finish_scaling = fs
+def simulate(sim = None):
+  global var_simulate
+  if sim is not None:
+    var_simulate = sim
+  return var_simulate
 
-def get_finish_scaling():
-  global finish_scaling
-  return finish_scaling
+def policy(pol = None):
+  global var_policy
+  if pol is not None:
+    var_policy = pol
+  return var_policy
