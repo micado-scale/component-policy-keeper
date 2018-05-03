@@ -39,12 +39,44 @@ def unhandled_exception(error):
   response.status_code = 500
   return response
 
-@app.route('/policy/start', methods=['POST'])
-def start_policy():
+@app.route('/policy/eval', methods=['POST'])
+def eval_policy():
+  global policy_thread
+  data_yaml = request.stream.read()
+  if not data_yaml:
+    raise RequestException(400, 'Empty POST data')
+  if policy_thread:
+    raise RequestException(400, 'Policy processing is already running')
+  else:
+    log.info('Received data: {0}'.format(data_yaml))
+    policy_yaml = pk_config.policy() 
+    policy = yaml.safe_load(policy_yaml)
+    policy_keeper.resolve_queries(policy)
+    policy_keeper.perform_one_session(policy)
+  return jsonify(dict(response='OK'))
+
+@app.route('/policy/set', methods=['POST'])
+def set_policy():
   global policy_thread
   policy_yaml = request.stream.read()
   if not policy_yaml:
     raise RequestException(400, 'Empty POST data')
+  if policy_thread:
+    raise RequestException(400, 'Policy processing is already running')
+  else:
+    log.info('Received policy: {0}'.format(policy_yaml))
+    pk_config.policy(policy_yaml)
+  return jsonify(dict(response='OK'))
+
+@app.route('/policy/start', methods=['POST'])
+def start_policy():
+  global policy_thread
+  policy_yaml = request.stream.read()
+  if not policy_yaml: 
+    if pk_config.policy():
+      policy_yaml = pk_config.policy()
+    else:
+      raise RequestException(400, 'Empty POST data for /policy/start')
   if policy_thread:
     raise RequestException(400, 'Policy processing is already running')
   else:
@@ -57,7 +89,7 @@ def start_policy():
 def stop_policy():
   global policy_thread
   if policy_thread:
-    pk_config.set_finish_scaling(True)
+    pk_config.finish_scaling(True)
     policy_thread.join()
     policy_thread = None
   return jsonify(dict(response='OK'))

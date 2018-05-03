@@ -33,7 +33,7 @@ def perform_service_scaling(policy,service_name):
           service_name='{0}_{1}'.format(policy['stack'],srv['name'])
         else:
           service_name='{0}'.format(srv['name'])
-        config = pk_config.get_config()
+        config = pk_config.config()
         dock.scale_docker_service(config['swarm_endpoint'],service_name,int(srv['instances']))
 
 def perform_worker_node_scaling(policy):
@@ -42,7 +42,7 @@ def perform_worker_node_scaling(policy):
     log.debug('(S) Scaling values for worker node: min:{0} max:{1} calculated:{2}'
              .format(node['min'],node['max'],node['instances']))
     node['instances'] = max(min(int(node['instances']),int(node['max'])),int(node['min']))
-    config = pk_config.get_config()
+    config = pk_config.config()
     occo.scale_occopus_worker_node(
         endpoint=config['occopus_endpoint'],
         infra_name=config['occopus_infra_name'],
@@ -92,10 +92,10 @@ def load_policy_from_file(policyfile):
     policy = f.read()
   return policy
 
-def start(policy_yaml):
+def prepare_session(policy_yaml):
   global log
   log = logging.getLogger('pk')
-  config = pk_config.get_config()
+  config = pk_config.config()
   log.info('Received policy: \n{0}'.format(policy_yaml))
   policy = yaml.safe_load(policy_yaml)
   resolve_queries(policy)
@@ -112,47 +112,60 @@ def start(policy_yaml):
                                       policy.get('stack','pk'))
   log.info('(C) Notify prometheus to reload config starts')
   prom.notify_to_reload_config(config['prometheus_endpoint'])
-  while not pk_config.get_finish_scaling():
-    try:
-      log.info('(Q) Query evaluation for nodes starts')
-      queries = prom.evaluate_data_queries_for_nodes(config['prometheus_endpoint'],policy)
-      if queries:
-        for attrname, attrvalue in queries.iteritems():
-          log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
-      
-        log.info('(P) Policy evaluation for nodes starts')
-        perform_policy_evaluation_on_worker_nodes(policy)
-        log.info('(S) Scaling of nodes starts')
-        perform_worker_node_scaling(policy)
-      else:
-        log.info('(Q) No query evaluation performed for nodes, skipping policy evaluation')
+  return policy
 
-      for oneservice in policy.get('scaling',dict()).get('services',dict()):
-        service_name=oneservice.get('name')
-        log.info('(Q) Query evaluation for service "{0}" starts'.format(service_name))
-        queries = prom.evaluate_data_queries_for_a_service(config['prometheus_endpoint'],policy,service_name)
-        if queries:
-          for attrname, attrvalue in queries.iteritems():
-            log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
-          log.info('(P) Policy evaluation for service "{0}" starts'.format(service_name))
-          perform_policy_evaluation_on_a_docker_service(policy,service_name)
-          log.info('(S) Scaling of service "{0}" starts'.format(service_name))
-          perform_service_scaling(policy,service_name)
-        else:
-          log.info('(Q) No query evaluation performed for service "{0}", skipping policy evaluation'
-                   .format(service_name))
+def perform_one_session(policy):
+  global log
+  log = logging.getLogger('pk')
+  log.info('(Q) Query evaluation for nodes starts')
+  config = pk_config.config()
+
+  queries = prom.evaluate_data_queries_for_nodes(config['prometheus_endpoint'],policy)
+  if queries:
+    for attrname, attrvalue in queries.iteritems():
+      log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
+    log.info('(P) Policy evaluation for nodes starts')
+    perform_policy_evaluation_on_worker_nodes(policy)
+    log.info('(S) Scaling of nodes starts')
+    perform_worker_node_scaling(policy)
+  else:
+    log.info('(Q) No query evaluation performed for nodes, skipping policy evaluation')
+
+  for oneservice in policy.get('scaling',dict()).get('services',dict()):
+    service_name=oneservice.get('name')
+    log.info('(Q) Query evaluation for service "{0}" starts'.format(service_name))
+    queries = prom.evaluate_data_queries_for_a_service(config['prometheus_endpoint'],policy,service_name)
+    if queries:
+      for attrname, attrvalue in queries.iteritems():
+	log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
+      log.info('(P) Policy evaluation for service "{0}" starts'.format(service_name))
+      perform_policy_evaluation_on_a_docker_service(policy,service_name)
+      log.info('(S) Scaling of service "{0}" starts'.format(service_name))
+      perform_service_scaling(policy,service_name)
+    else:
+      log.info('(Q) No query evaluation performed for service "{0}", skipping policy evaluation'
+	       .format(service_name))
+  return
+
+def start(policy_yaml):
+  global log
+  log = logging.getLogger('pk')
+  policy = prepare_session(policy_yaml)
+  while not pk_config.finish_scaling():
+    try:
+      perform_one_session(policy)
     except Exception as e:
       log.exception('Exception occured during policy execution:')
     for x in range(15):
-      if pk_config.get_finish_scaling():
+      if pk_config.finish_scaling():
         break
       time.sleep(1)
-  pk_config.set_finish_scaling(False)
+  pk_config.finish_scaling(False)
 
 def stop(policy_yaml):
   global log
   log = logging.getLogger('pk')
-  config = pk_config.get_config()
+  config = pk_config.config()
   policy = yaml.safe_load(policy_yaml)
   log.info('(C) Remove exporters from prometheus configuration file starts')
   prom.remove_exporters_from_prometheus_config(config['prometheus_config_template'],
@@ -168,7 +181,10 @@ def stop(policy_yaml):
                                                 config['swarm_endpoint'])
 
 def perform_policy_keeping(policy_yaml):
-  start(policy_yaml)
+  try:
+    start(policy_yaml)
+  except Exception:
+    log.warning('Shutting down...')
   stop(policy_yaml)
 
 def pkmain():
@@ -186,26 +202,29 @@ def pkmain():
                       dest='cfg_srv',
                       default=False,
                       help='run in service mode')
+  parser.add_argument('--simulate',
+                      action='store_true',
+                      dest='cfg_simulate',
+                      default=False,
+                      help='ommit manipulating surrounding components')
   args = parser.parse_args()
-
-  #print 'CFG: '+args.cfg_path 
-  #print 'POLICY: '+(args.cfg_policy if args.cfg_policy else 'undefined')
-  #print 'SRV: '+str(args.cfg_srv) 
- 
   #read configuration
   try:
     with open(args.cfg_path,'r') as c:
-      pk_config.set_config(yaml.safe_load(c))
+      pk_config.config(yaml.safe_load(c))
   except Exception as e:
     print 'ERROR: Cannot read configuration file "{0}": {1}'.format(args.cfg_path,str(e))
-  config = pk_config.get_config()
+  config = pk_config.config()
   #initialise logging facility based on the configuration
   try: 
     logging.config.dictConfig(config['logging'])
     log = logging.getLogger('pk')
   except Exception as e:
     print 'ERROR: Cannot process configuration file "{0}": {1}'.format(args.cfg_path,str(e))
-
+  #set simulate mode
+  pk_config.simulate(args.cfg_simulate)
+  if args.cfg_simulate:
+    log.warning('SIMULATION mode is active! No changes will be performed.')
   #read policy file and start periodic policy evaluation in case of command-line mode 
   if not args.cfg_srv:
     if not args.cfg_policy:
