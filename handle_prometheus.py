@@ -45,53 +45,71 @@ def filter_data_queries_by_target(queries,target):
     if target.find(param)!= -1:
       result[param]=query
 
-def evaluate_data_queries_for_nodes(endpoint,policy):
+def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy):
   log=logging.getLogger('pk_prometheus')
-  items = dict()
+  queries, alerts = dict(), dict()
   if 'query_results' not in policy['data']:
     policy['data']['query_results']=dict()
-  if 'queries' in policy['data']:
-    target_str = policy.get('scaling',dict()).get('nodes',dict()).get('target','')
-    for param,query in policy['data']['queries'].iteritems():
-      try:
-        if target_str is not None and target_str.find(param) != -1:
-          if pk_config.simulate():
-            continue
-          response = requests.get(endpoint+"/api/v1/query?query="+query).json()
-          log.debug('Prometheus response query "{0}":{1}'.format(query,response))
-          val = extract_value_from_prometheus_response(query,response,dict())
-          policy['data']['query_results'][param]=float(val)
-          items[param]=float(val)
-      except Exception as e:
-        policy['data']['query_results'][param]=None
-        items[param]=None
-        log.warning('Evaluating expression for query "{0}" failed: {1}'.format(param,e.message))
-  return items
+  target_str = policy.get('scaling',dict()).get('nodes',dict()).get('target','')
+  for param,query in policy.get('data',dict()).get('queries',dict()).iteritems():
+    try:
+      if target_str is not None and target_str.find(param) != -1:
+	if pk_config.simulate():
+	  continue
+	response = requests.get(endpoint+"/api/v1/query?query="+query).json()
+	log.debug('Prometheus response query "{0}":{1}'.format(query,response))
+	val = extract_value_from_prometheus_response(query,response,dict())
+	policy['data']['query_results'][param]=float(val)
+	queries[param]=float(val)
+    except Exception as e:
+      policy['data']['query_results'][param]=None
+      queries[param]=None
+      log.warning('Evaluating expression for query "{0}" failed: {1}'.format(param,e.message))
+  policy['data']['alert_results']={}
+  for item in policy.get('data',dict()).get('alerts',dict()):
+    attrname = item['alert']
+    if target_str is not None and target_str.find(attrname) != -1:
+      if alerts_query(attrname) is not None:
+        policy['data']['alert_results'][attrname]=True
+        alerts[attrname]=True
+      else:
+        policy['data']['alert_results'][attrname]=False
+        alerts[attrname]=False
+  return queries, alerts
 
-def evaluate_data_queries_for_a_service(endpoint,policy,servicename):
+def evaluate_data_queries_and_alerts_for_a_service(endpoint,policy,servicename):
   log=logging.getLogger('pk_prometheus')
-  items = dict()
+  queries, alerts = dict(), dict()
   if 'query_results' not in policy['data']:
     policy['data']['query_results']=dict()
-  if 'queries' in policy['data']:
-    all_services = policy.get('scaling',dict()).get('services',dict())
-    target_service = [ srv for srv in all_services if srv.get('name','')==servicename ]
-    target_str = target_service[0].get('target','') if target_service else ''
-    for param,query in policy['data']['queries'].iteritems():
-      try:
-        if target_str is not None and target_str.find(param) != -1:
-          if pk_config.simulate():
-            continue
-          response = requests.get(endpoint+"/api/v1/query?query="+query).json()
-          log.debug('Prometheus response query "{0}":{1}'.format(query,response))
-          val = extract_value_from_prometheus_response(query,response,dict())
-          policy['data']['query_results'][param]=float(val)
-          items[param]=float(val)
-      except Exception as e:
-        policy['data']['query_results'][param]=None
-        items[param]=None
-        log.warning('Evaluating expression for query "{0}" failed: {1}'.format(param,e.message))
-  return items
+  all_services = policy.get('scaling',dict()).get('services',dict())
+  target_service = [ srv for srv in all_services if srv.get('name','')==servicename ]
+  target_str = target_service[0].get('target','') if target_service else ''
+  for param,query in policy.get('data',dict()).get('queries',dict()).iteritems():
+    try:
+      if target_str is not None and target_str.find(param) != -1:
+	if pk_config.simulate():
+	  continue
+	response = requests.get(endpoint+"/api/v1/query?query="+query).json()
+	log.debug('Prometheus response query "{0}":{1}'.format(query,response))
+	val = extract_value_from_prometheus_response(query,response,dict())
+	policy['data']['query_results'][param]=float(val)
+	queries[param]=float(val)
+    except Exception as e:
+      policy['data']['query_results'][param]=None
+      queries[param]=None
+      log.warning('Evaluating expression for query "{0}" failed: {1}'.format(param,e.message))
+  policy['data']['alert_results']={}
+  for item in policy.get('data',dict()).get('alerts',dict()):
+    attrname = item['alert']
+    if target_str is not None and target_str.find(attrname) != -1:
+      if alerts_query(attrname) is not None:
+        policy['data']['alert_results'][attrname]=True
+        alerts[attrname]=True
+      else:
+        policy['data']['alert_results'][attrname]=False
+        alerts[attrname]=False
+  return queries, alerts
 
 def add_exporters_to_prometheus_config(policy, template_file, config_file):
   log=logging.getLogger('pk_prometheus')
@@ -218,7 +236,7 @@ def alerts_isany():
   global alerts
   return True if alerts else False
 
-def alerts_remove(name):
+def alerts_remove(name = None):
   global alerts
   alerts.pop(name,None) if name else alerts.clear()
 
@@ -236,7 +254,7 @@ def alerts_add(alert):
     stored_alerts.append(name)
   return stored_alerts
 
-def alerts_query(name):
+def alerts_query(name = None):
   global alerts
   if not name:
     return alerts

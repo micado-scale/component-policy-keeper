@@ -170,12 +170,13 @@ def perform_one_session(policy, results = None):
   global log
   log = logging.getLogger('pk')
   config = pk_config.config()
-
+      
+  log.info('--- session starts ---')
   log.info('(Q) Evaluating queries and alerts for nodes starts')
   if results:
     queries, alerts = add_query_results_and_alerts_to_nodes(policy, results)
   else:
-    queries = prom.evaluate_data_queries_for_nodes(config['prometheus_endpoint'],policy)
+    queries, alerts = prom.evaluate_data_queries_and_alerts_for_nodes(config['prometheus_endpoint'],policy)
   if queries or alerts:
     for attrname, attrvalue in queries.iteritems():
       log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
@@ -194,7 +195,8 @@ def perform_one_session(policy, results = None):
     if results:
       queries, alerts = add_query_results_and_alerts_to_service(policy, results, service_name)
     else:
-      queries = prom.evaluate_data_queries_for_a_service(config['prometheus_endpoint'],policy,service_name)
+      queries, alerts = prom.evaluate_data_queries_and_alerts_for_a_service(
+                             config['prometheus_endpoint'],policy,service_name)
     if queries or alerts:
       for attrname, attrvalue in queries.iteritems():
 	log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
@@ -207,6 +209,9 @@ def perform_one_session(policy, results = None):
     else:
       log.info('(Q) No query evaluation performed for service "{0}", skipping policy evaluation'
 	       .format(service_name))
+ 
+  prom.alerts_remove()
+  log.info('--- session finishes ---')
   return
 
 def start(policy_yaml):
