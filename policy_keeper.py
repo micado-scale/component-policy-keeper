@@ -58,9 +58,11 @@ def perform_policy_evaluation_on_a_docker_service(policy,service_name):
      inpvars = {}
      if 'instances' not in srv:
        srv['instances']=srv['min']
-     for attrname, attrvalue in policy['data']['query_results'].iteritems():
+     for attrname, attrvalue in policy.get('data',dict()).get('query_results',dict()).iteritems():
        inpvars[attrname]=attrvalue
-     for attrname, attrvalue in policy['data']['constants'].iteritems():
+     for attrname, attrvalue in policy.get('data',dict()).get('alert_results',dict()).iteritems():
+       inpvars[attrname]=attrvalue
+     for attrname, attrvalue in policy.get('data',dict()).get('constants',dict()).iteritems():
        inpvars[attrname]=attrvalue
      inpvars['instances'] = srv['instances']
      if srv.get('target','') is not None:
@@ -75,9 +77,11 @@ def perform_policy_evaluation_on_worker_nodes(policy):
    outvars = ['instances']
    if 'instances' not in node:
      node['instances']=node['min']
-   for attrname, attrvalue in policy['data']['query_results'].iteritems():
+   for attrname, attrvalue in policy.get('data',dict()).get('query_results',dict()).iteritems():
      inpvars[attrname]=attrvalue
-   for attrname, attrvalue in policy['data']['constants'].iteritems():
+   for attrname, attrvalue in policy.get('data',dict()).get('alert_results',dict()).iteritems():
+     inpvars[attrname]=attrvalue
+   for attrname, attrvalue in policy.get('data',dict()).get('constants',dict()).iteritems():
      inpvars[attrname]=attrvalue
    inpvars['instances'] = node['instances']
    if node.get('target','') is not None:
@@ -114,58 +118,88 @@ def prepare_session(policy_yaml):
   prom.notify_to_reload_config(config['prometheus_endpoint'])
   return policy
 
-def add_query_results_to_nodes(policy, results):
-  queries = dict()
+def add_query_results_and_alerts_to_nodes(policy, results):
+  queries, alerts = dict(), dict()
   policy['data']['query_results']={}
+  policy['data']['alert_results']={}
   target_str = policy.get('scaling',dict()).get('nodes',dict()).get('target','')
-  for attrname, attrvalue in results['data']['queries'].iteritems():
+  for attrname, attrvalue in results.get('data',dict()).get('queries',dict()).iteritems():
     if target_str is not None and target_str.find(attrname) != -1:
       queries[attrname]=attrvalue
       policy['data']['query_results'][attrname]=attrvalue
-  return queries
+  fired_alerts = dict()
+  for item in results.get('data',dict()).get('alerts',dict):
+    fired_alerts[item['alert']]=True
+  for item in policy.get('data',dict()).get('alerts',dict()):
+    attrname = item['alert']
+    if target_str is not None and target_str.find(attrname) != -1:
+      if attrname in fired_alerts:
+        policy['data']['alert_results'][attrname]=True
+        alerts[attrname]=True
+      else:
+        policy['data']['alert_results'][attrname]=False
+        alerts[attrname]=False
+  return queries, alerts
   
-def add_query_results_to_service(policy, results, servicename):
-  queries = dict()
+def add_query_results_and_alerts_to_service(policy, results, servicename):
+  queries, alerts = dict(), dict()
   policy['data']['query_results']={}
+  policy['data']['alert_results']={}
   all_services = policy.get('scaling',dict()).get('services',dict())
   target_service = [ srv for srv in all_services if srv.get('name','')==servicename ]
   target_str = target_service[0].get('target','') if target_service else ''
-  for attrname,attrvalue in results['data']['queries'].iteritems():
+  for attrname,attrvalue in results.get('data',dict()).get('queries',dict()).iteritems():
     if target_str is not None and target_str.find(attrname) != -1:
       queries[attrname]=attrvalue
       policy['data']['query_results'][attrname]=attrvalue
-  return queries
+  fired_alerts = dict()
+  for item in results.get('data',dict()).get('alerts',dict):
+    fired_alerts[item['alert']]=True
+  for item in policy.get('data',dict()).get('alerts',dict()):
+    attrname = item['alert']
+    if target_str is not None and target_str.find(attrname) != -1:
+      if attrname in fired_alerts:
+        policy['data']['alert_results'][attrname]=True
+        alerts[attrname]=True
+      else:
+        policy['data']['alert_results'][attrname]=False
+        alerts[attrname]=False
+  return queries, alerts
 
 def perform_one_session(policy, results = None):
   global log
   log = logging.getLogger('pk')
-  log.info('(Q) Query evaluation for nodes starts')
   config = pk_config.config()
 
+  log.info('(Q) Evaluating queries and alerts for nodes starts')
   if results:
-    queries = add_query_results_to_nodes(policy, results)
+    queries, alerts = add_query_results_and_alerts_to_nodes(policy, results)
   else:
     queries = prom.evaluate_data_queries_for_nodes(config['prometheus_endpoint'],policy)
-  if queries:
+  if queries or alerts:
     for attrname, attrvalue in queries.iteritems():
       log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
+    for attrname, attrvalue in alerts.iteritems():
+      log.info('(A) => "{0}" is "{1}".'.format(attrname,attrvalue))
     log.info('(P) Policy evaluation for nodes starts')
     perform_policy_evaluation_on_worker_nodes(policy)
     log.info('(S) Scaling of nodes starts')
     perform_worker_node_scaling(policy)
   else:
-    log.info('(Q) No query evaluation performed for nodes, skipping policy evaluation')
+    log.info('(Q) No query or alert evaluation performed for nodes, skipping policy evaluation')
 
   for oneservice in policy.get('scaling',dict()).get('services',dict()):
     service_name=oneservice.get('name')
-    log.info('(Q) Query evaluation for service "{0}" starts'.format(service_name))
+    log.info('(Q) Evaluating queries and alerts for service "{0}" starts'.format(service_name))
     if results:
-      queries = add_query_results_to_service(policy, results, service_name)
+      queries, alerts = add_query_results_and_alerts_to_service(policy, results, service_name)
     else:
       queries = prom.evaluate_data_queries_for_a_service(config['prometheus_endpoint'],policy,service_name)
-    if queries:
+    if queries or alerts:
       for attrname, attrvalue in queries.iteritems():
 	log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
+      for attrname, attrvalue in alerts.iteritems():
+	log.info('(A) => "{0}" is "{1}".'.format(attrname,attrvalue))
       log.info('(P) Policy evaluation for service "{0}" starts'.format(service_name))
       perform_policy_evaluation_on_a_docker_service(policy,service_name)
       log.info('(S) Scaling of service "{0}" starts'.format(service_name))
