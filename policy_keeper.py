@@ -128,7 +128,7 @@ def add_query_results_and_alerts_to_nodes(policy, results):
       queries[attrname]=attrvalue
       policy['data']['query_results'][attrname]=attrvalue
   fired_alerts = dict()
-  for item in results.get('data',dict()).get('alerts',dict):
+  for item in results.get('data',dict()).get('alerts',dict()):
     fired_alerts[item['alert']]=True
   for item in policy.get('data',dict()).get('alerts',dict()):
     attrname = item['alert']
@@ -153,7 +153,7 @@ def add_query_results_and_alerts_to_service(policy, results, servicename):
       queries[attrname]=attrvalue
       policy['data']['query_results'][attrname]=attrvalue
   fired_alerts = dict()
-  for item in results.get('data',dict()).get('alerts',dict):
+  for item in results.get('data',dict()).get('alerts',dict()):
     fired_alerts[item['alert']]=True
   for item in policy.get('data',dict()).get('alerts',dict()):
     attrname = item['alert']
