@@ -1,0 +1,31 @@
+stack: cqueue
+data:
+  sources:
+    - '192.168.154.116:8090'
+  constants:
+    NAME: 'cqueue_worker'
+  queries:
+    AVGLOADOFNODES: '(100-(avg(rate(node_cpu{group="worker_cluster",mode="idle"}[60s]))*100))'
+scaling:
+  nodes: 
+    min: 1
+    max: 5
+    target: |
+      if len(m_nodes) == m_node_count and m_time_since_node_count_changed > 60:
+        if AVGLOADOFNODES > 90:
+          m_node_count+=1
+        if AVGLOADOFNODES < 40:
+          m_node_count-=1
+      else:
+        print('Transient phase, skipping update of nodes...')
+  services:
+    - name: "worker"
+      min: 1
+      max: 10
+      target: | 
+        if len(m_nodes) == m_node_count:
+          m_container_count = m_node_count
+        else:
+          print('Transient phase, skipping update of containers...')
+          
+        
