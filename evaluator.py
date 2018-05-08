@@ -87,7 +87,7 @@ def evaluate(eval_code, input_variables={}, output_variables=[]):
         no_assert = True,
         no_delete = True,
         no_raise = True,
-        no_print = True)
+        no_print = False)
     aeval(eval_code)
     symtable = {x: sym[x] for x in sym if x in output_variables}
     return symtable
