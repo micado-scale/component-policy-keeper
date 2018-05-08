@@ -243,12 +243,13 @@ def alerts_remove(name = None):
 def alerts_add(alert):
   global alerts
   stored_alerts = []
+  log=logging.getLogger('pk_prometheus')
   for a in alert.get('alerts'):
+    log.info('(A) New alert arrived: {0}\n'.format(a))
     name = a.get('labels',dict()).get('alertname')
     if a.get('status') != 'firing':
       continue
     if name in alerts:
-      log=logging.getLogger('pk_prometheus')
       log.warning('(A) Alert "{0}" is already among unhandled alerts!'.format(name))
     alerts[name] = a.get('endsAt')
     stored_alerts.append(name)
