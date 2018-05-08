@@ -170,6 +170,26 @@ def collect_inputs_for_nodes(policy):
   inputs['m_nodes']=dock.query_list_of_ready_nodes(config['swarm_endpoint'])
   mnc = node.get('outputs',dict()).get('m_node_count',None)
   inputs['m_node_count'] = max(min(int(mnc),int(node['max'])),int(node['min'])) if mnc else int(node['min'])
+  
+  prev_node_count = node.get('inputs',dict()).get('m_node_count',None)
+  prev_nodes = node.get('inputs',dict()).get('m_nodes',None)
+  if prev_node_count and prev_nodes:
+    if prev_node_count == len(prev_nodes):
+      if inputs['m_node_count']==len(inputs['m_nodes']):
+        inputs['m_time_when_node_count_changed'] = node.get('inputs',dict()).get('m_time_when_node_count_changed',0)
+      else:
+        inputs['m_time_when_node_count_changed'] = 0
+    else:
+      if inputs['m_node_count']==len(inputs['m_nodes']):
+        inputs['m_time_when_node_count_changed'] = int(time.time())
+      else:
+        inputs['m_time_when_node_count_changed'] = 0
+  else:
+    inputs['m_time_when_node_count_changed'] = int(time.time())
+  if inputs['m_time_when_node_count_changed'] == 0:
+    inputs['m_time_since_node_count_changed'] = 0
+  else:
+    inputs['m_time_since_node_count_changed'] = int(time.time())-inputs['m_time_when_node_count_changed']
   return inputs
 
 def set_policy_inputs_for_nodes(policy,inputs):
@@ -210,22 +230,20 @@ def perform_one_session(policy, results = None):
     queries, alerts = add_query_results_and_alerts_to_nodes(policy, results)
   else:
     queries, alerts = prom.evaluate_data_queries_and_alerts_for_nodes(config['prometheus_endpoint'],policy)
-  if queries or alerts:
-    for attrname, attrvalue in queries.iteritems():
-      log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
-    for attrname, attrvalue in alerts.iteritems():
-      log.info('(A) => "{0}" is "{1}".'.format(attrname,attrvalue))
-    log.info('(P) Policy evaluation for nodes starts')
-    perform_policy_evaluation_on_worker_nodes(policy)
-    log.info('(S) Scaling of nodes starts')
-    perform_worker_node_scaling(policy)
-  else:
-    log.info('(Q) No query or alert evaluation performed for nodes, skipping policy evaluation')
- 
+  for attrname, attrvalue in queries.iteritems():
+    log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
+  for attrname, attrvalue in alerts.iteritems():
+    log.info('(A) => "{0}" is "{1}".'.format(attrname,attrvalue))
+  log.info('(P) Policy evaluation for nodes starts')
+  perform_policy_evaluation_on_worker_nodes(policy)
+  log.info('(S) Scaling of nodes starts')
+  perform_worker_node_scaling(policy)
+  for attrname, attrvalue in alerts.iteritems():
+    prom.alerts_remove(attrname)
   
   for oneservice in policy.get('scaling',dict()).get('services',dict()):
     service_name=oneservice.get('name')
-    log.info('(I) Collecting inputs for nodes starts')
+    log.info('(I) Collecting inputs for service "{0}" starts'.format(service_name))
     inputs = collect_inputs_for_containers(policy,service_name)
     set_policy_inputs_for_containers(policy,service_name,inputs)
     for x in inputs.keys():
@@ -236,21 +254,18 @@ def perform_one_session(policy, results = None):
     else:
       queries, alerts = prom.evaluate_data_queries_and_alerts_for_a_service(
                              config['prometheus_endpoint'],policy,service_name)
-    if queries or alerts:
-      for attrname, attrvalue in queries.iteritems():
-	log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
-      for attrname, attrvalue in alerts.iteritems():
-	log.info('(A) => "{0}" is "{1}".'.format(attrname,attrvalue))
-      log.info('(P) Policy evaluation for service "{0}" starts'.format(service_name))
-      perform_policy_evaluation_on_a_docker_service(policy,service_name)
-      log.info('(S) Scaling of service "{0}" starts'.format(service_name))
-      perform_service_scaling(policy,service_name)
-    else:
-      log.info('(Q) No query evaluation performed for service "{0}", skipping policy evaluation'
-	       .format(service_name))
+    for attrname, attrvalue in queries.iteritems():
+      log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
+    for attrname, attrvalue in alerts.iteritems():
+      log.info('(A) => "{0}" is "{1}".'.format(attrname,attrvalue))
+    log.info('(P) Policy evaluation for service "{0}" starts'.format(service_name))
+    perform_policy_evaluation_on_a_docker_service(policy,service_name)
+    log.info('(S) Scaling of service "{0}" starts'.format(service_name))
+    perform_service_scaling(policy,service_name)
+    for attrname, attrvalue in alerts.iteritems():
+      prom.alerts_remove(attrname)
  
-  prom.alerts_remove()
-  log.info('--- session finishes ---')
+  log.info('--- session finished ---')
   return
 
 def start(policy_yaml):
@@ -290,7 +305,7 @@ def perform_policy_keeping(policy_yaml):
   try:
     start(policy_yaml)
   except Exception:
-    log.warning('Shutting down...')
+    log.exception('Internal exception during policy execution:')
   stop(policy_yaml)
 
 def pkmain():
