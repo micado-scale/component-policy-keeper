@@ -10,7 +10,6 @@ ipaddress==1.0.19
 Jinja2==2.10
 MarkupSafe==1.0
 numpy==1.14.0
-pkg-resources==0.0.0
 post==0.0.26
 public==0.0.65
 query-string==0.0.28
