@@ -50,11 +50,12 @@ def perform_worker_node_scaling(policy):
         replicas=nodecount)
 
 def perform_policy_evaluation_on_a_docker_service(policy,service_name):
-   outvars = ['m_container_count']
+   outvars = ['m_container_count','m_userdata']
    for srv in policy['scaling']['services']:
      if srv['name'] != service_name:
        continue
      inpvars = srv['inputs']
+     inpvars['m_userdata'] = policy['scaling'].get('userdata',None)
      for attrname, attrvalue in policy.get('data',dict()).get('query_results',dict()).iteritems():
        inpvars[attrname]=attrvalue
      for attrname, attrvalue in policy.get('data',dict()).get('alert_results',dict()).iteritems():
@@ -66,13 +67,15 @@ def perform_policy_evaluation_on_a_docker_service(policy,service_name):
        if 'outputs' not in srv:
          srv['outputs']={}
        srv['outputs']['m_container_count']=int(result.get('m_container_count',srv['inputs']['m_container_count']))
+       policy['scaling']['userdata']=result.get('m_userdata',None)
      log.info('(P) => m_container_count: {0}'.format(int(srv['outputs']['m_container_count'])))
    return
 
 def perform_policy_evaluation_on_worker_nodes(policy):
    node = policy['scaling']['nodes']
    inpvars = node['inputs']
-   outvars = ['m_node_count']
+   outvars = ['m_node_count','m_userdata']
+   inpvars['m_userdata'] = policy['scaling'].get('userdata',None)
    for attrname, attrvalue in policy.get('data',dict()).get('query_results',dict()).iteritems():
      inpvars[attrname]=attrvalue
    for attrname, attrvalue in policy.get('data',dict()).get('alert_results',dict()).iteritems():
@@ -84,6 +87,7 @@ def perform_policy_evaluation_on_worker_nodes(policy):
      if 'outputs' not in node:
        node['outputs']={}
      node['outputs']['m_node_count']=int(result.get('m_node_count',node['inputs']['m_node_count']))
+     policy['scaling']['userdata']=result.get('m_userdata',None)
    log.info('(P) => m_node_count: {0}'.format(int(node['outputs']['m_node_count'])))
    return
 
@@ -190,6 +194,8 @@ def collect_inputs_for_nodes(policy):
     inputs['m_time_since_node_count_changed'] = 0
   else:
     inputs['m_time_since_node_count_changed'] = int(time.time())-inputs['m_time_when_node_count_changed']
+ 
+  inputs['m_userdata']=policy.get('scaling',dict()).get('userdata',None)
   return inputs
 
 def set_policy_inputs_for_nodes(policy,inputs):
@@ -207,6 +213,7 @@ def collect_inputs_for_containers(policy,service_name):
       mcc = theservice.get('outputs',dict()).get('m_container_count',None)
       inputs['m_container_count'] = max(min(int(mcc),int(theservice['max'])),int(theservice['min']))\
             if mcc else int(theservice['min'])
+  inputs['m_userdata']=policy.get('scaling',dict()).get('userdata',None)
   return inputs
 
 def set_policy_inputs_for_containers(policy,service_name,inputs):
@@ -272,6 +279,7 @@ def start(policy_yaml):
   global log
   log = logging.getLogger('pk')
   policy = prepare_session(policy_yaml)
+  pk_config.finish_scaling(False)
   while not pk_config.finish_scaling():
     try:
       perform_one_session(policy)
@@ -281,7 +289,6 @@ def start(policy_yaml):
       if pk_config.finish_scaling():
         break
       time.sleep(1)
-  pk_config.finish_scaling(False)
 
 def stop(policy_yaml):
   global log
