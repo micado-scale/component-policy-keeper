@@ -31,6 +31,9 @@ scaling:
         if len(m_nodes) == m_node_count:
           m_container_count = m_node_count
         else:
-          print('Transient phase, skipping update of containers...')
+          if m_container_count > m_node_count:
+            m_container_count = m_node_count
+          else:
+            print('Transient phase, skipping update of containers...')
           
         
