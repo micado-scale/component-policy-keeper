@@ -6,7 +6,7 @@ services:
    prometheus:
     ...
    policykeeper:
-    image: policykeeper:1.0
+    image: cola-registry.lpds.sztaki.hu/smith/policykeeper
     container_name: policykeeper
     depends_on:
       - occopus
