@@ -1,17 +1,15 @@
-FROM ubuntu:16.04
+FROM python:2.7-slim
 
 #Install Occopus dependencies
 RUN apt-get update && apt-get install -y \
-    python \
-    python-dev \
-    python-pip \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-#Install Occopus from source
-RUN curl https://raw.githubusercontent.com/micado-scale/component-policy-keeper/master/requirements.txt -o policy_keeper_requirements.txt 
-RUN pip install --upgrade pip
-RUN pip install -r policy_keeper_requirements.txt 
+    curl && \
+    curl https://raw.githubusercontent.com/micado-scale/component-policy-keeper/master/requirements.txt -o policy_keeper_requirements.txt && \
+    pip install --upgrade pip && \
+    pip install -r policy_keeper_requirements.txt && \
+    apt-get remove --purge -y curl && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /root/.cache
 
 COPY docker-entrypoint.sh /usr/local/bin
 ENTRYPOINT ["docker-entrypoint.sh"]
