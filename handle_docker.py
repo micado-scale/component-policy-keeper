@@ -35,7 +35,7 @@ def scale_docker_service(endpoint,service_name,replicas):
       mode={'Replicated': {'Replicas': replicas}},
       fetch_current_spec=True)
   except Exception as e:
-    log.exception('(S) Scaling of docker service "{0}" failed:'.format(service_name))
+    log.error('(S) Scaling of docker service "{0}" failed: {1}'.format(service_name,str(e)))
   return
 
 def query_service_network(endpoint, stack_name, service_name):
