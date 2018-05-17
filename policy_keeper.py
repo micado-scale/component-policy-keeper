@@ -16,12 +16,11 @@ import pk_config
 
 log = None
 
-def resolve_queries(policy):
-  if policy['data'].get('queries') and policy['data'].get('constants'):
-    for param,query in policy['data']['queries'].iteritems():
-      template = jinja2.Template(query)
-      newq = template.render(policy['data']['constants'])
-      policy['data']['queries'][param]=newq
+def resolve_queries(policy_yaml):
+  values = yaml.safe_load(policy_yaml).get('data',dict()).get('constants','')
+  log.info('values: {0}'.format(values))
+  template = jinja2.Template(policy_yaml)
+  return template.render(values)
 
 def perform_service_scaling(policy,service_name):
   for srv in policy['scaling']['services']:
@@ -102,8 +101,9 @@ def prepare_session(policy_yaml):
   log = logging.getLogger('pk')
   config = pk_config.config()
   log.info('Received policy: \n{0}'.format(policy_yaml))
+  policy_yaml = resolve_queries(policy_yaml)
+  log.info('Resolved policy: \n{0}'.format(policy_yaml))
   policy = yaml.safe_load(policy_yaml)
-  resolve_queries(policy)
   log.info('(C) Add exporters to prometheus configuration file starts')
   prom.add_exporters_to_prometheus_config(policy,
                                           config['prometheus_config_template'],
