@@ -335,6 +335,14 @@ def pkmain():
                       dest='cfg_simulate',
                       default=False,
                       help='ommit manipulating surrounding components')
+  parser.add_argument('--host',
+                      type=str,
+                      default='127.0.0.1',
+                      help='host to bind service to')
+  parser.add_argument('--port',
+                      type=int,
+                      default='12345',
+                      help='port to bind service to')
   args = parser.parse_args()
   #read configuration
   try:
@@ -374,8 +382,8 @@ def pkmain():
       log.warning('Policy file in parameter is unsused, must be defined through the API in service mode!')
     pk_rest.init_service()
     pk_rest.app.run(debug=True,
-                    host='0.0.0.0',
-                    port=12345)
+                    host=args.host,
+                    port=args.port)
   
 if __name__ == '__main__':
   pkmain()
