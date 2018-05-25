@@ -26,8 +26,8 @@ def perform_service_scaling(policy,service_name):
   for srv in policy['scaling']['services']:
     if 'm_container_count' in srv.get('outputs',dict()) and srv['name']==service_name:
         log.debug('(S) Scaling values for service "{0}": min:{1} max:{2} calculated:{3}'
-		.format(srv['name'],srv['min'],srv['max'],srv['outputs']['m_container_count']))
-        containercount = max(min(int(srv['outputs']['m_container_count']),int(srv['max'])),int(srv['min']))
+		.format(srv['name'],srv['min_instances'],srv['max_instances'],srv['outputs']['m_container_count']))
+        containercount = max(min(int(srv['outputs']['m_container_count']),int(srv['max_instances'])),int(srv['min_instances']))
 	if policy.get('stack','') not in [None, '']:
           service_name='{0}_{1}'.format(policy['stack'],srv['name'])
         else:
@@ -39,8 +39,8 @@ def perform_worker_node_scaling(policy):
   node = policy['scaling']['nodes']
   if 'm_node_count' in node.get('outputs',dict()):
     log.debug('(S) Scaling values for worker node: min:{0} max:{1} calculated:{2}'
-             .format(node['min'],node['max'],node['outputs']['m_node_count']))
-    nodecount = max(min(int(node['outputs']['m_node_count']),int(node['max'])),int(node['min']))
+             .format(node['min_instances'],node['max_instances'],node['outputs']['m_node_count']))
+    nodecount = max(min(int(node['outputs']['m_node_count']),int(node['max_instances'])),int(node['min_instances']))
     config = pk_config.config()
     occo.scale_occopus_worker_node(
         endpoint=config['occopus_endpoint'],
@@ -61,8 +61,8 @@ def perform_policy_evaluation_on_a_docker_service(policy,service_name):
        inpvars[attrname]=attrvalue
      for attrname, attrvalue in policy.get('data',dict()).get('constants',dict()).iteritems():
        inpvars[attrname]=attrvalue
-     if srv.get('target','') is not None:
-       result = evaluator.evaluate(srv.get('target',''), inpvars, outvars)
+     if srv.get('scaling_rule','') is not None:
+       result = evaluator.evaluate(srv.get('scaling_rule',''), inpvars, outvars)
        if 'outputs' not in srv:
          srv['outputs']={}
        srv['outputs']['m_container_count']=int(result.get('m_container_count',srv['inputs']['m_container_count']))
@@ -81,8 +81,8 @@ def perform_policy_evaluation_on_worker_nodes(policy):
      inpvars[attrname]=attrvalue
    for attrname, attrvalue in policy.get('data',dict()).get('constants',dict()).iteritems():
      inpvars[attrname]=attrvalue
-   if node.get('target','') is not None:
-     result = evaluator.evaluate(node.get('target',''), inpvars, outvars)
+   if node.get('scaling_rule','') is not None:
+     result = evaluator.evaluate(node.get('scaling_rule',''), inpvars, outvars)
      if 'outputs' not in node:
        node['outputs']={}
      node['outputs']['m_node_count']=int(result.get('m_node_count',node['inputs']['m_node_count']))
@@ -123,9 +123,9 @@ def add_query_results_and_alerts_to_nodes(policy, results):
   queries, alerts = dict(), dict()
   policy['data']['query_results']={}
   policy['data']['alert_results']={}
-  target_str = policy.get('scaling',dict()).get('nodes',dict()).get('target','')
+  scaling_rule_str = policy.get('scaling',dict()).get('nodes',dict()).get('scaling_rule','')
   for attrname, attrvalue in results.get('data',dict()).get('queries',dict()).iteritems():
-    if target_str is not None and target_str.find(attrname) != -1:
+    if scaling_rule_str is not None and scaling_rule_str.find(attrname) != -1:
       queries[attrname]=attrvalue
       policy['data']['query_results'][attrname]=attrvalue
   fired_alerts = dict()
@@ -133,7 +133,7 @@ def add_query_results_and_alerts_to_nodes(policy, results):
     fired_alerts[item['alert']]=True
   for item in policy.get('data',dict()).get('alerts',dict()):
     attrname = item['alert']
-    if target_str is not None and target_str.find(attrname) != -1:
+    if scaling_rule_str is not None and scaling_rule_str.find(attrname) != -1:
       if attrname in fired_alerts:
         policy['data']['alert_results'][attrname]=True
         alerts[attrname]=True
@@ -148,9 +148,9 @@ def add_query_results_and_alerts_to_service(policy, results, servicename):
   policy['data']['alert_results']={}
   all_services = policy.get('scaling',dict()).get('services',dict())
   target_service = [ srv for srv in all_services if srv.get('name','')==servicename ]
-  target_str = target_service[0].get('target','') if target_service else ''
+  scaling_rule_str = target_service[0].get('scaling_rule','') if target_service else ''
   for attrname,attrvalue in results.get('data',dict()).get('queries',dict()).iteritems():
-    if target_str is not None and target_str.find(attrname) != -1:
+    if scaling_rule_str is not None and scaling_rule_str.find(attrname) != -1:
       queries[attrname]=attrvalue
       policy['data']['query_results'][attrname]=attrvalue
   fired_alerts = dict()
@@ -158,7 +158,7 @@ def add_query_results_and_alerts_to_service(policy, results, servicename):
     fired_alerts[item['alert']]=True
   for item in policy.get('data',dict()).get('alerts',dict()):
     attrname = item['alert']
-    if target_str is not None and target_str.find(attrname) != -1:
+    if scaling_rule_str is not None and scaling_rule_str.find(attrname) != -1:
       if attrname in fired_alerts:
         policy['data']['alert_results'][attrname]=True
         alerts[attrname]=True
@@ -173,7 +173,7 @@ def collect_inputs_for_nodes(policy):
   config = pk_config.config()
   inputs['m_nodes']=dock.query_list_of_ready_nodes(config['swarm_endpoint'])
   mnc = node.get('outputs',dict()).get('m_node_count',None)
-  inputs['m_node_count'] = max(min(int(mnc),int(node['max'])),int(node['min'])) if mnc else int(node['min'])
+  inputs['m_node_count'] = max(min(int(mnc),int(node['max_instances'])),int(node['min_instances'])) if mnc else int(node['min_instances'])
   
   prev_node_count = node.get('inputs',dict()).get('m_node_count',None)
   prev_nodes = node.get('inputs',dict()).get('m_nodes',None)
@@ -207,12 +207,12 @@ def collect_inputs_for_containers(policy,service_name):
   node = policy.get('scaling',dict()).get('nodes',dict())
   inputs['m_nodes']=dock.query_list_of_ready_nodes(config['swarm_endpoint'])
   mnc = node.get('outputs',dict()).get('m_node_count',None)
-  inputs['m_node_count'] = max(min(int(mnc),int(node['max'])),int(node['min'])) if mnc else int(node['min'])
+  inputs['m_node_count'] = max(min(int(mnc),int(node['max_instances'])),int(node['min_instances'])) if mnc else int(node['min_instances'])
   for theservice in policy.get('scaling',dict()).get('services',dict()):
     if service_name == theservice.get('name',''):
       mcc = theservice.get('outputs',dict()).get('m_container_count',None)
-      inputs['m_container_count'] = max(min(int(mcc),int(theservice['max'])),int(theservice['min']))\
-            if mcc else int(theservice['min'])
+      inputs['m_container_count'] = max(min(int(mcc),int(theservice['max_instances'])),int(theservice['min_instances']))\
+            if mcc else int(theservice['min_instances'])
   inputs['m_userdata']=policy.get('scaling',dict()).get('userdata',None)
   return inputs
 
