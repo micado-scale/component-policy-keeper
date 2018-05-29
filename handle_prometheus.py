@@ -39,10 +39,10 @@ def extract_value_from_prometheus_response(expression,response,filterdict=dict()
                       .format(expression,str(value)))
   return value[1]
 
-def filter_data_queries_by_target(queries,target):
+def filter_data_queries_by_scaling_rule(queries,scaling_rule):
   result=dict()
   for param,query in queries.iteritems():
-    if target.find(param)!= -1:
+    if scaling_rule.find(param)!= -1:
       result[param]=query
 
 def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy):
@@ -50,10 +50,10 @@ def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy):
   queries, alerts = dict(), dict()
   if 'query_results' not in policy['data']:
     policy['data']['query_results']=dict()
-  target_str = policy.get('scaling',dict()).get('nodes',dict()).get('target','')
+  scaling_rule_str = policy.get('scaling',dict()).get('nodes',dict()).get('scaling_rule','')
   for param,query in policy.get('data',dict()).get('queries',dict()).iteritems():
     try:
-      if target_str is not None and target_str.find(param) != -1:
+      if scaling_rule_str is not None and scaling_rule_str.find(param) != -1:
 	if pk_config.simulate():
 	  continue
 	response = requests.get(endpoint+"/api/v1/query?query="+query).json()
@@ -68,7 +68,7 @@ def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy):
   policy['data']['alert_results']={}
   for item in policy.get('data',dict()).get('alerts',dict()):
     attrname = item['alert']
-    if target_str is not None and target_str.find(attrname) != -1:
+    if scaling_rule_str is not None and scaling_rule_str.find(attrname) != -1:
       if alerts_query(attrname) is not None:
         policy['data']['alert_results'][attrname]=True
         alerts[attrname]=True
@@ -84,10 +84,10 @@ def evaluate_data_queries_and_alerts_for_a_service(endpoint,policy,servicename):
     policy['data']['query_results']=dict()
   all_services = policy.get('scaling',dict()).get('services',dict())
   target_service = [ srv for srv in all_services if srv.get('name','')==servicename ]
-  target_str = target_service[0].get('target','') if target_service else ''
+  scaling_rule_str = target_service[0].get('scaling_rule','') if target_service else ''
   for param,query in policy.get('data',dict()).get('queries',dict()).iteritems():
     try:
-      if target_str is not None and target_str.find(param) != -1:
+      if scaling_rule_str is not None and scaling_rule_str.find(param) != -1:
 	if pk_config.simulate():
 	  continue
 	response = requests.get(endpoint+"/api/v1/query?query="+query).json()
@@ -102,7 +102,7 @@ def evaluate_data_queries_and_alerts_for_a_service(endpoint,policy,servicename):
   policy['data']['alert_results']={}
   for item in policy.get('data',dict()).get('alerts',dict()):
     attrname = item['alert']
-    if target_str is not None and target_str.find(attrname) != -1:
+    if scaling_rule_str is not None and scaling_rule_str.find(attrname) != -1:
       if alerts_query(attrname) is not None:
         policy['data']['alert_results'][attrname]=True
         alerts[attrname]=True
