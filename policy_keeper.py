@@ -17,7 +17,7 @@ import pk_config
 log = None
 
 def resolve_queries(policy_yaml):
-  values = yaml.safe_load(policy_yaml).get('data',dict()).get('constants','')
+  values = yaml.safe_load(policy_yaml).get('data',dict()).get('constants',dict())
   log.info('values: {0}'.format(values))
   template = jinja2.Template(policy_yaml)
   return template.render(values)
@@ -67,7 +67,7 @@ def perform_policy_evaluation_on_a_docker_service(policy,service_name):
          srv['outputs']={}
        srv['outputs']['m_container_count']=int(result.get('m_container_count',srv['inputs']['m_container_count']))
        policy['scaling']['userdata']=result.get('m_userdata',None)
-     log.info('(P) => m_container_count: {0}'.format(int(srv['outputs']['m_container_count'])))
+     log.info('(P) => m_container_count: {0}'.format(int(srv.get('outputs',dict()).get('m_container_count',0))))
    return
 
 def perform_policy_evaluation_on_worker_nodes(policy):
@@ -87,7 +87,7 @@ def perform_policy_evaluation_on_worker_nodes(policy):
        node['outputs']={}
      node['outputs']['m_node_count']=int(result.get('m_node_count',node['inputs']['m_node_count']))
      policy['scaling']['userdata']=result.get('m_userdata',None)
-   log.info('(P) => m_node_count: {0}'.format(int(node['outputs']['m_node_count'])))
+   log.info('(P) => m_node_count: {0}'.format(int(node.get('outputs',dict()).get('m_node_count',0))))
    return
 
 def load_policy_from_file(policyfile):
@@ -171,7 +171,7 @@ def collect_inputs_for_nodes(policy):
   inputs={}
   node = policy.get('scaling',dict()).get('nodes',dict())
   config = pk_config.config()
-  inputs['m_nodes']=dock.query_list_of_ready_nodes(config['swarm_endpoint'])
+  inputs['m_nodes']=dock.query_list_of_nodes(config['swarm_endpoint'])
   mnc = node.get('outputs',dict()).get('m_node_count',None)
   inputs['m_node_count'] = max(min(int(mnc),int(node['max_instances'])),int(node['min_instances'])) if mnc else int(node['min_instances'])
   
@@ -205,7 +205,7 @@ def collect_inputs_for_containers(policy,service_name):
   inputs={}
   config = pk_config.config()
   node = policy.get('scaling',dict()).get('nodes',dict())
-  inputs['m_nodes']=dock.query_list_of_ready_nodes(config['swarm_endpoint'])
+  inputs['m_nodes']=dock.query_list_of_nodes(config['swarm_endpoint'])
   mnc = node.get('outputs',dict()).get('m_node_count',None)
   inputs['m_node_count'] = max(min(int(mnc),int(node['max_instances'])),int(node['min_instances'])) if mnc else int(node['min_instances'])
   for theservice in policy.get('scaling',dict()).get('services',dict()):
@@ -225,8 +225,9 @@ def perform_one_session(policy, results = None):
   global log
   log = logging.getLogger('pk')
   config = pk_config.config()
-
   log.info('--- session starts ---')
+  log.info('(M) Maintaining docker nodes starts')
+  dock.down_nodes_maintenance(config['swarm_endpoint'],config['docker_node_unreachable_timeout'])
   log.info('(I) Collecting inputs for nodes starts')
   inputs = collect_inputs_for_nodes(policy)
   set_policy_inputs_for_nodes(policy,inputs)
@@ -300,7 +301,7 @@ def stop(policy_yaml):
                                                config['prometheus_config_target'])
   log.info('(C) Remove alerts from prometheus, deleting rule files starts')
   prom.remove_alerts_under_prometheus(config['prometheus_rules_directory'],
-                                      policy.get('data',dict()).get('alerts'),
+                                      policy.get('data',dict()).get('alerts',dict()),
                                       policy.get('stack','pk'))
   log.info('(C) Notify prometheus to reload config starts')
   prom.notify_to_reload_config(config['prometheus_endpoint'])

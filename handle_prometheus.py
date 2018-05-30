@@ -48,6 +48,8 @@ def filter_data_queries_by_scaling_rule(queries,scaling_rule):
 def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy):
   log=logging.getLogger('pk_prometheus')
   queries, alerts = dict(), dict()
+  if 'data' not in policy:
+    policy['data']={}
   if 'query_results' not in policy['data']:
     policy['data']['query_results']=dict()
   scaling_rule_str = policy.get('scaling',dict()).get('nodes',dict()).get('scaling_rule','')
