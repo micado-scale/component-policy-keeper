@@ -1,25 +1,27 @@
 import docker
 import logging
 import pk_config
+import time
 
-def query_list_of_ready_nodes(endpoint):
+def query_list_of_nodes(endpoint,status='ready'):
   log=logging.getLogger('pk_docker')
-  ready_nodes=[]
+  list_of_nodes=[]
   if pk_config.simulate():
     return None
   client = docker.APIClient(endpoint)
   try:
     nodes = client.nodes(filters={'role': 'worker'})
     for n in nodes:
-      if n.get('Status',dict).get('State','')=='ready':
+      if n.get('Status',dict).get('State','')==status:
         a = {}
-        a['CreatedAt']=n.get('CreatedAt','')
+        a['ID']=n.get('ID','undefID')
         a['Addr']=n.get('Status',dict()).get('Addr','')
-        ready_nodes.append(a.copy())
-    return ready_nodes
+        list_of_nodes.append(a.copy())
+    return list_of_nodes
   except Exception as e:
     log.exception('(Q) Query of docker nodes failed.')
     return None
+
 
 def scale_docker_service(endpoint,service_name,replicas):
   log=logging.getLogger('pk_docker')
@@ -84,6 +86,47 @@ def detach_container_from_network(endpoint, container, network_id):
     log.info('Container "{0}" cannot be disconnected from network "{1}" as it is not running.'
 	     .format(container,network.name))
   return
-    
 
+down_nodes_stored={}    
+
+def remove_node(endpoint,id):
+  log=logging.getLogger('pk_docker')
+  if pk_config.simulate():
+    return
+  try:
+    client = docker.APIClient(endpoint)
+    client.remove_node(id,True)
+  except Exception:
+    log.error('(M) => Removing docker node failed.')
+  return
+
+def down_nodes_cleanup_by_list(stored, actual):
+  setStored = { v['ID'] for k,v in stored.items() }
+  setActual = { x['ID'] for x in actual }
+  missing = { x for x in setStored if x not in setActual }
+  for x in missing:
+    del stored[x]
+
+def down_nodes_add_from_list(stored, actual):
+  for node in actual:
+    if 'ID' in node and node['ID'] not in stored:
+      stored[node['ID']]=node
+      stored[node['ID']]['micado_timestamp']=int(time.time())
+
+def down_nodes_cleanup_by_timeout(endpoint, stored, timeout):
+  log=logging.getLogger('pk_docker')
+  current_time = int(time.time())
+  for id, node in stored.items():
+    if node['micado_timestamp']+timeout < current_time:
+      log.info('(M) => Node {0} is down for more than {1} seconds, removing.'.format(id,timeout))
+      remove_node(endpoint,id)
+      del stored[id]
+
+def down_nodes_maintenance(endpoint, down_nodes_timeout = 120):
+  log=logging.getLogger('pk_docker')
+  down_nodes_actual = query_list_of_nodes(endpoint,status='down')
+  down_nodes_cleanup_by_list(down_nodes_stored, down_nodes_actual)
+  down_nodes_add_from_list(down_nodes_stored, down_nodes_actual)
+  down_nodes_cleanup_by_timeout(endpoint, down_nodes_stored, down_nodes_timeout)
+  return
 
