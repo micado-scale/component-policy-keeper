@@ -19,9 +19,10 @@ log = None
 def resolve_queries(policy_yaml):
   stack = dict()
   stack['stack'] = yaml.safe_load(policy_yaml).get('stack','undefined_stack_name')
-  template = jinja2.Template(policy_yaml)
+  env = jinja2.Environment(undefined=jinja2.DebugUndefined)
+  template = env.from_string(policy_yaml)
   policy_yaml = template.render(stack)
-  
+
   values = yaml.safe_load(policy_yaml).get('data',dict()).get('constants',dict())
   log.info('values: {0}'.format(values))
   template = jinja2.Template(policy_yaml)
