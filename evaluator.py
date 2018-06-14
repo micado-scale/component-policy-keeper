@@ -58,7 +58,7 @@ def timeout(seconds, force_kill=True):
     return wrapper
 
 
-@timeout(0.5)
+@timeout(3)
 def evaluate(eval_code, input_variables={}, output_variables=[]):
     """Evaluates a given expression, with the timeout given as decorator.
 
