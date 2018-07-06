@@ -22,7 +22,6 @@ def query_list_of_nodes(endpoint,status='ready'):
     log.exception('(Q) Query of docker nodes failed.')
     return None
 
-
 def scale_docker_service(endpoint,service_name,replicas):
   log=logging.getLogger('pk_docker')
   log.info('(S) => m_container_count: {0}'.format(replicas))
@@ -39,6 +38,20 @@ def scale_docker_service(endpoint,service_name,replicas):
   except Exception as e:
     log.warning('(S) Scaling of docker service "{0}" failed: {1}'.format(service_name,str(e)))
   return
+
+def query_docker_service_replicas(endpoint,service_name):
+  log=logging.getLogger('pk_docker')
+  instance = 1
+  if pk_config.simulate():
+    return
+  client = docker.APIClient(endpoint)
+  try:
+    response = client.inspect_service(service_name)
+    instance = response.get('Spec',dict()).get('Mode',dict()).get('Replicated',dict()).get('Replicas',1)
+    log.debug('(C) => m_container_count for {0}: {1}'.format(service_name,instance))
+  except Exception as e:
+    log.warning('(C) Querying docker service "{0}" replicas failed: {1}'.format(service_name,str(e)))
+  return instance
 
 def query_service_network(endpoint, stack_name, service_name):
   id = None
