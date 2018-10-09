@@ -98,7 +98,7 @@ def perform_policy_evaluation_on_worker_nodes(policy):
      node['outputs']['m_node_count']=int(result.get('m_node_count',node['inputs']['m_node_count']))
      policy['scaling']['userdata']=result.get('m_userdata',None)
    log.info('(P) => m_node_count: {0}'.format(int(node.get('outputs',dict()).get('m_node_count',0))))
-   return
+   return False if node['outputs']['m_node_count'] == node['inputs']['m_node_count'] else True 
 
 def load_policy_from_file(policyfile):
   policy = None
@@ -281,9 +281,9 @@ def perform_one_session(policy, results = None):
   for attrname, attrvalue in alerts.iteritems():
     log.info('(A) => "{0}" is "{1}".'.format(attrname,attrvalue))
   log.info('(P) Policy evaluation for nodes starts')
-  perform_policy_evaluation_on_worker_nodes(policy)
-  log.info('(S) Scaling of nodes starts')
-  perform_worker_node_scaling(policy)
+  if perform_policy_evaluation_on_worker_nodes(policy):
+    log.info('(S) Scaling of nodes starts')
+    perform_worker_node_scaling(policy)
   for attrname, attrvalue in alerts.iteritems():
     prom.alerts_remove(attrname)
   
