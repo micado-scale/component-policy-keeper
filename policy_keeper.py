@@ -3,7 +3,7 @@ import time, sys
 import requests
 from ruamel import yaml
 import json
-import handle_docker as dock
+import handle_k8s as dock
 import handle_occopus as occo
 import handle_prometheus as prom
 import jinja2
@@ -179,7 +179,7 @@ def add_query_results_and_alerts_to_nodes(policy, results):
         policy['data']['alert_results'][attrname]=False
         alerts[attrname]=False
   return queries, alerts
-  
+
 def add_query_results_and_alerts_to_service(policy, results, servicename):
   queries, alerts = dict(), dict()
   policy['data']['query_results']={}
@@ -212,7 +212,7 @@ def collect_inputs_for_nodes(policy):
   inputs['m_nodes']=dock.query_list_of_nodes(config['swarm_endpoint'])
   mnc = node.get('outputs',dict()).get('m_node_count',None)
   inputs['m_node_count'] = max(min(int(mnc),int(node['max_instances'])),int(node['min_instances'])) if mnc else int(node['min_instances'])
-  
+
   prev_node_count = node.get('inputs',dict()).get('m_node_count',None)
   prev_nodes = node.get('inputs',dict()).get('m_nodes',None)
   if prev_node_count and prev_nodes:
@@ -232,7 +232,7 @@ def collect_inputs_for_nodes(policy):
     inputs['m_time_since_node_count_changed'] = 0
   else:
     inputs['m_time_since_node_count_changed'] = int(time.time())-inputs['m_time_when_node_count_changed']
- 
+
   inputs['m_userdata']=policy.get('scaling',dict()).get('userdata',None)
   return inputs
 
@@ -286,7 +286,7 @@ def perform_one_session(policy, results = None):
   perform_worker_node_scaling(policy)
   for attrname, attrvalue in alerts.iteritems():
     prom.alerts_remove(attrname)
-  
+
   for oneservice in policy.get('scaling',dict()).get('services',dict()):
     service_name=oneservice.get('name')
     log.info('(I) Collecting inputs for service "{0}" starts'.format(service_name))
@@ -310,7 +310,7 @@ def perform_one_session(policy, results = None):
     perform_service_scaling(policy,service_name)
     for attrname, attrvalue in alerts.iteritems():
       prom.alerts_remove(attrname)
- 
+
   log.info('--- session finished ---')
   return
 
@@ -391,7 +391,7 @@ def pkmain():
     print 'ERROR: Cannot read configuration file "{0}": {1}'.format(args.cfg_path,str(e))
   config = pk_config.config()
   #initialise logging facility based on the configuration
-  try: 
+  try:
     logging.config.dictConfig(config['logging'])
     log = logging.getLogger('pk')
   except Exception as e:
@@ -400,7 +400,7 @@ def pkmain():
   pk_config.simulate(args.cfg_simulate)
   if args.cfg_simulate:
     log.warning('SIMULATION mode is active! No changes will be performed.')
-  #read policy file and start periodic policy evaluation in case of command-line mode 
+  #read policy file and start periodic policy evaluation in case of command-line mode
   if not args.cfg_srv:
     if not args.cfg_policy:
       log.error('Policy file must be specified for standalone execution!')
@@ -408,7 +408,7 @@ def pkmain():
     try:
       policy_yaml = load_policy_from_file(args.cfg_policy)
       start(policy_yaml)
-    except KeyboardInterrupt: 
+    except KeyboardInterrupt:
       log.warning('Keyboard interruption detected! Shutting down...')
       stop(policy_yaml)
     except Exception:
@@ -423,6 +423,6 @@ def pkmain():
     pk_rest.app.run(debug=True,
                     host=args.host,
                     port=args.port)
-  
+
 if __name__ == '__main__':
   pkmain()
