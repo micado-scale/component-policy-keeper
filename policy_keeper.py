@@ -318,7 +318,6 @@ def start(policy_yaml):
   global log
   log = logging.getLogger('pk')
   policy = prepare_session(policy_yaml)
-  pk_config.finish_scaling(False)
   while not pk_config.finish_scaling():
     try:
       perform_one_session(policy)
