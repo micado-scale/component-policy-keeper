@@ -1,7 +1,7 @@
 import logging
 import requests
 from ruamel import yaml
-import handle_docker as dock
+import handle_k8s as dock
 import shutil,os
 import pk_config
 
@@ -18,7 +18,7 @@ def extract_value_from_prometheus_response(expression,response,filterdict=dict()
       raise Exception('Unrecognised prometheus response for expression "{0}": "{1}"'
                       .format(expression,str(response)))
   if response['data']['resultType']=='vector':
-    result = [ x for x in response['data']['result'] 
+    result = [ x for x in response['data']['result']
              if x.get('metric',None) is not None and is_subdict(filterdict,x['metric']) ]
     if len(result)>1:
       raise Exception('Multiple results in prometheus response for expression "{0}": "{1}"'
@@ -123,7 +123,7 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
     if 'scrape_configs' not in config_content:
       config_content['scrape_configs']=[]
     #Find proper scrape_config or create
-    scrape_config = [ x for x in config_content['scrape_configs'] 
+    scrape_config = [ x for x in config_content['scrape_configs']
 		      if x.get('job_name','')=='micado' and 'static_configs' in x ]
     if not scrape_config:
       config_content['scrape_configs'].append({'job_name': 'micado','static_configs':[]})
@@ -141,7 +141,7 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
     else:
       static_config = static_config[0]
 
-    config_changed = False 
+    config_changed = False
     for exporter_endpoint in policy.get('data',dict()).get('sources',dict()):
       if exporter_endpoint not in static_config['targets']:
         static_config['targets'].append(exporter_endpoint)
@@ -262,4 +262,3 @@ def alerts_query(name = None):
   if not name:
     return alerts
   return alerts[name] if name in alerts else None
-
