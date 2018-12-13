@@ -27,7 +27,7 @@ def query_list_of_nodes(endpoint,status='ready'):
     return None
 
 def scale_docker_service(endpoint,service_name,replicas):
-  service_name = service_name.split('_')[1]
+  service_name = '-'.join(service_name.split('_')[1:])
   log=logging.getLogger('pk_docker')
   log.info('(S) => m_container_count: {0}'.format(replicas))
   if pk_config.simulate():
@@ -43,7 +43,7 @@ def scale_docker_service(endpoint,service_name,replicas):
   return
 
 def query_docker_service_replicas(endpoint,service_name):
-  service_name = service_name.split('_')[1]
+  service_name = '-'.join(service_name.split('_')[1:])
   log=logging.getLogger('pk_docker')
   instance = 1
   if pk_config.simulate():
