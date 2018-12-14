@@ -1,7 +1,7 @@
 import logging
 import requests
 from ruamel import yaml
-import handle_k8s as dock
+import handle_k8s as k8s
 import shutil,os
 import pk_config
 
@@ -144,6 +144,10 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
     config_changed = False
     for exporter_endpoint in policy.get('data',dict()).get('sources',dict()):
       if exporter_endpoint not in static_config['targets']:
+        exp_ip, exp_port = exporter_endpoint.split(':')
+        if '.' not in exp_ip:
+          exp_ip = k8s.get_exporter_ip(exp_ip)
+          exporter_endpoint = ':'.join([exp_ip,exp_port])
         static_config['targets'].append(exporter_endpoint)
         config_changed = True
         log.info('(C) => exporter "{0}" added to config'.format(exporter_endpoint))
@@ -162,36 +166,6 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
 def remove_exporters_from_prometheus_config(template_file, config_file):
   if not pk_config.simulate():
     shutil.copyfile(template_file, config_file)
-
-def attach_prometheus_to_exporters_network(policy,swarm_endpoint):
-  log=logging.getLogger('pk_prometheus')
-  for exporter_endpoint in policy.get('data',dict()).get('sources',dict()):
-    try:
-      exporter_name=exporter_endpoint.split(':')[0]
-      if '.' not in exporter_name:
-        log.info('(C) => attaching prometheus to network of exporter "{0}"'.format(exporter_endpoint))
-        if pk_config.simulate():
-          continue
-        exporter_netid = dock.query_service_network(swarm_endpoint,policy['stack'],exporter_name)
-        if exporter_netid:
-          dock.attach_container_to_network(swarm_endpoint, 'prometheus', exporter_netid)
-    except Exception as e:
-      log.exception('Attaching prometheus to network of exporter failed:')
-
-def detach_prometheus_from_exporters_network(policy,swarm_endpoint):
-  log=logging.getLogger('pk_prometheus')
-  for exporter_endpoint in policy.get('data',dict()).get('sources',dict()):
-    try:
-      exporter_name=exporter_endpoint.split(':')[0]
-      if '.' not in exporter_name:
-        log.info('(C) => detaching prometheus from network of exporter "{0}"'.format(exporter_endpoint))
-        if pk_config.simulate():
-          continue
-        exporter_netid = dock.query_service_network(swarm_endpoint,policy['stack'],exporter_name)
-        if exporter_netid:
-          dock.detach_container_from_network(swarm_endpoint, 'prometheus', exporter_netid)
-    except Exception as e:
-      log.exception('Detaching prometheus from network of exporter failed:')
 
 def notify_to_reload_config(endpoint):
   log=logging.getLogger('pk_prometheus')
