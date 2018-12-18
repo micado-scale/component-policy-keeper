@@ -125,12 +125,15 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
     #Find proper scrape_config or create
     scrape_config = [ x for x in config_content['scrape_configs']
 		      if x.get('job_name','')=='micado' and 'static_configs' in x ]
+    consul_config = [ x for x in config_content['scrape_configs']
+		      if x.get('job_name','')=='cluster_monitoring' and 'consul_sd_configs' in x ]
     if not scrape_config:
       config_content['scrape_configs'].append({'job_name': 'micado','static_configs':[]})
       scrape_config = [ x for x in config_content['scrape_configs']
 		      if x.get('job_name','')=='micado' and 'static_configs' in x ][0]
     else:
       scrape_config = scrape_config[0]
+    consul_config = consul_config[0]['consul_sd_configs'][0]
     #Find proper static_config or create
     static_config = [ x for x in scrape_config['static_configs']
 		    if 'targets' in x.keys() ]
@@ -145,10 +148,13 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
     for exporter_endpoint in policy.get('data',dict()).get('sources',dict()):
       if exporter_endpoint not in static_config['targets']:
         exp_ip, exp_port = exporter_endpoint.split(':')
-        if '.' not in exp_ip:
+        if '.' not in exp_ip and 'consul' not in exp_ip:
           exp_ip = k8s.get_exporter_ip(exp_ip)
           exporter_endpoint = ':'.join([exp_ip,exp_port])
-        static_config['targets'].append(exporter_endpoint)
+        if 'consul' in exp_ip:
+          consul_config['services'].append("{}_cluster".format(policy['stack']))
+        else:
+          static_config['targets'].append(exporter_endpoint)
         config_changed = True
         log.info('(C) => exporter "{0}" added to config'.format(exporter_endpoint))
       else:
