@@ -144,14 +144,9 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
     config_changed = False
     for exporter_endpoint in policy.get('data',dict()).get('sources',dict()):
       if exporter_endpoint not in static_config['targets']:
-        exp_ip = exporter_endpoint.split(':')[0]
-        if '.' not in exp_ip:
-          k8s.add_exporter_label(exp_ip)
-          log.info('(C) => exporter "{0}" cluster ip label added'.format(exporter_endpoint))
-        else:
-          static_config['targets'].append(exporter_endpoint)
-          config_changed = True
-          log.info('(C) => exporter "{0}" added to config'.format(exporter_endpoint))
+        static_config['targets'].append(exporter_endpoint)
+        config_changed = True
+        log.info('(C) => exporter "{0}" added to config'.format(exporter_endpoint))
       else:
         log.info('(C) => exporter "{0}" skipped, already part of config'.format(exporter_endpoint))
 
