@@ -144,6 +144,9 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
     config_changed = False
     for exporter_endpoint in policy.get('data',dict()).get('sources',dict()):
       if exporter_endpoint not in static_config['targets']:
+        exp = exporter_endpoint.split(':')
+        if len(exp) == 1:
+          continue
         static_config['targets'].append(exporter_endpoint)
         config_changed = True
         log.info('(C) => exporter "{0}" added to config'.format(exporter_endpoint))
