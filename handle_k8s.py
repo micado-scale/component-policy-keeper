@@ -58,11 +58,16 @@ def query_k8s_replicas(endpoint,service_name):
     log.warning('(C) Querying k8s service "{0}" replicas failed: {1}'.format(service_name,str(e)))
   return instance
 
-def get_exporter_ip(exporter_name):
+def add_exporter_label(exporter_name):
   log=logging.getLogger('pk_k8s')
   kubernetes.config.load_kube_config()
   client = kubernetes.client.CoreV1Api()
-  return client.read_namespaced_service(exporter_name,"default").spec.cluster_ip
+  
+  service = client.read_namespaced_service(exporter_name,"default")
+  clusterip = service.spec.cluster_ip
+  service.metadata.labels.update({'cluster.ip': clusterip})
+  client.patch_namespaced_service(exporter_name, "default", service)
+
 
 down_nodes_stored={}
 

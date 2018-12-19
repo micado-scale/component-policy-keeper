@@ -56,13 +56,13 @@ def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy):
   for param,query in policy.get('data',dict()).get('queries',dict()).iteritems():
     try:
       if scaling_rule_str is not None and scaling_rule_str.find(param) != -1:
-	if pk_config.simulate():
-	  continue
-	response = requests.get(endpoint+"/api/v1/query?query="+query).json()
-	log.debug('Prometheus response query "{0}":{1}'.format(query,response))
-	val = extract_value_from_prometheus_response(query,response,dict())
-	policy['data']['query_results'][param]=float(val)
-	queries[param]=float(val)
+        if pk_config.simulate():
+          continue
+        response = requests.get(endpoint+"/api/v1/query?query="+query).json()
+        log.debug('Prometheus response query "{0}":{1}'.format(query,response))
+        val = extract_value_from_prometheus_response(query,response,dict())
+        policy['data']['query_results'][param]=float(val)
+        queries[param]=float(val)
     except Exception as e:
       policy['data']['query_results'][param]=None
       queries[param]=None
@@ -90,13 +90,13 @@ def evaluate_data_queries_and_alerts_for_a_service(endpoint,policy,servicename):
   for param,query in policy.get('data',dict()).get('queries',dict()).iteritems():
     try:
       if scaling_rule_str is not None and scaling_rule_str.find(param) != -1:
-	if pk_config.simulate():
-	  continue
-	response = requests.get(endpoint+"/api/v1/query?query="+query).json()
-	log.debug('Prometheus response query "{0}":{1}'.format(query,response))
-	val = extract_value_from_prometheus_response(query,response,dict())
-	policy['data']['query_results'][param]=float(val)
-	queries[param]=float(val)
+        if pk_config.simulate():
+          continue
+        response = requests.get(endpoint+"/api/v1/query?query="+query).json()
+        log.debug('Prometheus response query "{0}":{1}'.format(query,response))
+        val = extract_value_from_prometheus_response(query,response,dict())
+        policy['data']['query_results'][param]=float(val)
+        queries[param]=float(val)
     except Exception as e:
       policy['data']['query_results'][param]=None
       queries[param]=None
@@ -125,15 +125,12 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
     #Find proper scrape_config or create
     scrape_config = [ x for x in config_content['scrape_configs']
 		      if x.get('job_name','')=='micado' and 'static_configs' in x ]
-    consul_config = [ x for x in config_content['scrape_configs']
-		      if x.get('job_name','')=='cluster_monitoring' and 'consul_sd_configs' in x ]
     if not scrape_config:
       config_content['scrape_configs'].append({'job_name': 'micado','static_configs':[]})
       scrape_config = [ x for x in config_content['scrape_configs']
 		      if x.get('job_name','')=='micado' and 'static_configs' in x ][0]
     else:
       scrape_config = scrape_config[0]
-    consul_config = consul_config[0]['consul_sd_configs'][0]
     #Find proper static_config or create
     static_config = [ x for x in scrape_config['static_configs']
 		    if 'targets' in x.keys() ]
@@ -147,16 +144,14 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
     config_changed = False
     for exporter_endpoint in policy.get('data',dict()).get('sources',dict()):
       if exporter_endpoint not in static_config['targets']:
-        exp_ip, exp_port = exporter_endpoint.split(':')
-        if '.' not in exp_ip and 'consul' not in exp_ip:
-          exp_ip = k8s.get_exporter_ip(exp_ip)
-          exporter_endpoint = ':'.join([exp_ip,exp_port])
-        if 'consul' in exp_ip:
-          consul_config['services'].append("{}_cluster".format(policy['stack']))
+        exp_ip = exporter_endpoint.split(':')[0]
+        if '.' not in exp_ip:
+          k8s.add_exporter_label(exp_ip)
+          log.info('(C) => exporter "{0}" cluster ip label added'.format(exporter_endpoint))
         else:
           static_config['targets'].append(exporter_endpoint)
-        config_changed = True
-        log.info('(C) => exporter "{0}" added to config'.format(exporter_endpoint))
+          config_changed = True
+          log.info('(C) => exporter "{0}" added to config'.format(exporter_endpoint))
       else:
         log.info('(C) => exporter "{0}" skipped, already part of config'.format(exporter_endpoint))
 

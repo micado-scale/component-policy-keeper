@@ -3,6 +3,7 @@ import time, sys
 import requests
 from ruamel import yaml
 import json
+import shutil
 import handle_k8s as k8s
 import handle_occopus as occo
 import handle_prometheus as prom
@@ -129,9 +130,10 @@ def prepare_session(policy_yaml):
   log.info('Resolved policy: \n{0}'.format(policy_yaml))
   policy = yaml.safe_load(policy_yaml)
   log.info('(C) Add exporters to prometheus configuration file starts')
-  prom.add_exporters_to_prometheus_config(policy,
-                                          config['prometheus_config_template'],
-                                          config['prometheus_config_target'])
+  config_tpl = config['prometheus_config_template']
+  config_target = config['prometheus_config_target']
+  shutil(config_target, config_tpl)
+  prom.add_exporters_to_prometheus_config(policy, config_tpl, config_target)
   log.info('(C) Add alerts to prometheus, generating rule files starts')
   prom.deploy_alerts_under_prometheus(config['prometheus_rules_directory'],
                                       policy.get('data',dict()).get('alerts'),
