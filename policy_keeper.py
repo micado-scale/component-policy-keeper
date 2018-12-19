@@ -132,7 +132,7 @@ def prepare_session(policy_yaml):
   log.info('(C) Add exporters to prometheus configuration file starts')
   config_tpl = config['prometheus_config_template']
   config_target = config['prometheus_config_target']
-  shutil(config_target, config_tpl)
+  shutil.copy(config_target, config_tpl)
   prom.add_exporters_to_prometheus_config(policy, config_tpl, config_target)
   log.info('(C) Add alerts to prometheus, generating rule files starts')
   prom.deploy_alerts_under_prometheus(config['prometheus_rules_directory'],
