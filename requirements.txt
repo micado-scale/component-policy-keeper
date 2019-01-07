@@ -21,6 +21,6 @@ requests==2.20.0
 ruamel.ordereddict==0.4.13
 ruamel.yaml==0.15.35
 six==1.11.0
-urllib3==1.23
+urllib3==1.24.1
 websocket-client==0.46.0
 Werkzeug==0.14.1
