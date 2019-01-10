@@ -34,7 +34,7 @@ logging:
         pk:
             propagate: false
             handlers: [console, file]
-        pk_docker:
+        pk_k8s:
             propagate: false
             handlers: [console, file]
         pk_prometheus:
