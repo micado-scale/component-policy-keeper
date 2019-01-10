@@ -5,7 +5,7 @@ import pk_config
 import time
 
 def query_list_of_nodes(endpoint,status='ready'):
-  log=logging.getLogger('pk_docker')
+  log=logging.getLogger('pk_k8s')
   list_of_nodes=[]
   if pk_config.simulate():
     return None
@@ -26,9 +26,9 @@ def query_list_of_nodes(endpoint,status='ready'):
     log.exception('(Q) Query of k8s nodes failed.')
     return None
 
-def scale_docker_service(endpoint,service_name,replicas):
+def scale_k8s_deploy(endpoint,service_name,replicas):
   service_name = '-'.join(service_name.split('_')[1:])
-  log=logging.getLogger('pk_docker')
+  log=logging.getLogger('pk_k8s')
   log.info('(S) => m_container_count: {0}'.format(replicas))
   if pk_config.simulate():
     return
@@ -42,9 +42,9 @@ def scale_docker_service(endpoint,service_name,replicas):
     log.warning('(S) Scaling of k8s service "{0}" failed: {1}'.format(service_name,str(e)))
   return
 
-def query_docker_service_replicas(endpoint,service_name):
+def query_k8s_replicas(endpoint,service_name):
   service_name = '-'.join(service_name.split('_')[1:])
-  log=logging.getLogger('pk_docker')
+  log=logging.getLogger('pk_k8s')
   instance = 1
   if pk_config.simulate():
     return
@@ -58,55 +58,10 @@ def query_docker_service_replicas(endpoint,service_name):
     log.warning('(C) Querying k8s service "{0}" replicas failed: {1}'.format(service_name,str(e)))
   return instance
 
-def query_service_network(endpoint, stack_name, service_name):
-  id = None
-  log=logging.getLogger('pk_docker')
-  #client = docker.DockerClient(base_url=endpoint)
-  #full_service_name = stack_name + "_" + service_name
-  #if pk_config.simulate():
-    #return None
-  #service_list = client.services.list()
-  #i = 0
-  #while i < len(service_list) and service_list[i].name != full_service_name:
-    #i += 1
-  #if i < len(service_list) and service_list[i].name == full_service_name:
-    #if len(service_list[i].attrs.get("Spec").get("TaskTemplate").get("Networks")) == 1:
-      #id = service_list[i].attrs.get("Spec").get("TaskTemplate").get("Networks")[0].get("Target")
-      #log.debug('Docker service "{0}" in stack "{1}" is connected to network "{2}" with id "{3}".'
-		 #.format(service_name, stack_name, client.networks.get(id).name),str(id))
-    #else:
-      #log.warning('Docker service "{0}" is connected to more than one network.'.format(full_service_name))
-  #else:
-  log.warning('Docker networking not supported in kubernetes, cannot query')
-  return id
-
-
-def attach_container_to_network(endpoint, container, network_id):
-  log=logging.getLogger('pk_docker')
-  #client = docker.DockerClient(base_url=endpoint)
-  #network = client.networks.get(network_id)
-  #if client.containers.get(container).status == "running":
-    #network.connect(container)
-    #log.info('Container "{0}" is connected to network "{1}".'.format(container, network.name))
-  #else:
-  log.warning('Docker networking not supported in kubernetes, attach container failed')
-  return
-
-def detach_container_from_network(endpoint, container, network_id):
-  log=logging.getLogger('pk_docker')
-  #client = docker.DockerClient(base_url=client_address, version=client_version)
-  #network = client.networks.get(network_id)
-  #if client.containers.get(container).status == "running":
-    #network.disconnect(container)
-    #log.info('Container "{0}" is disconnected from network "{1}".'.format(container, network.name))
-  #else:
-  log.warning('Docker networking not supported in kubernetes, detach container failed')
-  return
-
 down_nodes_stored={}
 
 def remove_node(endpoint,id):
-  log=logging.getLogger('pk_docker')
+  log=logging.getLogger('pk_k8s')
   if pk_config.simulate():
     return
   kubernetes.config.load_kube_config()
@@ -131,7 +86,7 @@ def down_nodes_add_from_list(stored, actual):
       stored[node['ID']]['micado_timestamp']=int(time.time())
 
 def down_nodes_cleanup_by_timeout(endpoint, stored, timeout):
-  log=logging.getLogger('pk_docker')
+  log=logging.getLogger('pk_k8s')
   current_time = int(time.time())
   for id, node in stored.items():
     if node['micado_timestamp']+timeout < current_time:
@@ -140,7 +95,7 @@ def down_nodes_cleanup_by_timeout(endpoint, stored, timeout):
       del stored[id]
 
 def down_nodes_maintenance(endpoint, down_nodes_timeout = 120):
-  log=logging.getLogger('pk_docker')
+  log=logging.getLogger('pk_k8s')
   down_nodes_actual = query_list_of_nodes(endpoint,status='down')
   down_nodes_cleanup_by_list(down_nodes_stored, down_nodes_actual)
   down_nodes_add_from_list(down_nodes_stored, down_nodes_actual)
