@@ -6,7 +6,7 @@ data:
     NAME: 'cqueue_worker'
   queries:
     AVGCPULOAD: '100 - (avg (rate(node_cpu{group="worker_cluster",mode="idle"}[60s])) * 100)'
-    AVGWORKERLOAD: 'avg(rate(container_cpu_usage_seconds_total{container_label_com_docker_swarm_service_name="{{NAME}}" }[30s]))*100'
+    AVGWORKERLOAD: 'avg(rate(container_cpu_usage_seconds_total{container_label_io_kubernetes_container_name="{{NAME}}" }[30s]))*100'
   alerts:
     - alert: time_elapsed
       expr: 'vector(1525268017-time()) < 0'
