@@ -11,6 +11,7 @@ idna==2.6
 ipaddress==1.0.19
 itsdangerous==0.24
 Jinja2==2.10
+kubernetes==8.0.1
 MarkupSafe==1.0
 numpy==1.14.0
 post==0.0.26
