@@ -147,7 +147,24 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
         exp = exporter_endpoint.split(':')
         if len(exp) == 1:
           continue
-        static_config['targets'].append(exporter_endpoint)
+        elif '.' not in exp[0]:
+          kube_job = [x for x in config_content['scrape_configs'] if x.get('job_name') == 'kube-services']
+          if not kube_job:
+            continue
+          relabel = kube_job[0].get('relabel_configs', [])
+          old_label = [x for x in relabel if x.get('action') == 'keep']
+          if old_label:
+            old_label = old_label[0]
+            old_regex = old_label.get('regex')
+            new_regex = '{}|.*{}'.format(old_regex, exp[1])
+            old_label['regex'] = new_regex
+          else:
+            label = {'source_labels': ['__address__'],
+                     'action': 'keep',
+                     'regex': '.*{}'.format(exp[1])}
+            relabel.append(label)
+        else:
+          static_config['targets'].append(exporter_endpoint)
         config_changed = True
         log.info('(C) => exporter "{0}" added to config'.format(exporter_endpoint))
       else:
