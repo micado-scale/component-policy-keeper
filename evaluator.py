@@ -73,10 +73,10 @@ def evaluate(eval_code, input_variables={}, output_variables=[]):
     """
     # FIXME: use_numpy the process blocks infinitely at the return statement
     import time
-    sym = make_symbol_table(time=time, use_numpy=False, range=range, **input_variables)
+    sym = make_symbol_table(time=time, use_numpy=True, range=range, **input_variables)
     aeval = Interpreter(
         symtable = sym,
-        use_numpy = False,
+        use_numpy = True,
         no_if = False,
         no_for = False,
         no_while = False,
