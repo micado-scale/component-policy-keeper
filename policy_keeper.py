@@ -56,7 +56,7 @@ def perform_worker_node_scaling(policy):
     occo.scale_worker_node(
         endpoint=config['occopus_endpoint'],
         infra_name=config['occopus_infra_name'],
-        worker_name=config['occopus_worker_name'],
+        worker_name=node['name'],
         replicas=nodecount)
 
 def perform_policy_evaluation_on_a_k8s_deploy(policy,service_name):
@@ -141,10 +141,11 @@ def prepare_session(policy_yaml):
   log.info('(C) Notify prometheus to reload config starts')
   prom.notify_to_reload_config(config['prometheus_endpoint'])
   log.info('(C) Querying number of target nodes from Occopus starts')
+  node = policy['scaling']['nodes']
   instances = occo.query_number_of_worker_nodes(
                    endpoint=config['occopus_endpoint'],
                    infra_name=config['occopus_infra_name'],
-                   worker_name=config['occopus_worker_name'])
+                   worker_name=node['name'])
   log.info('(C) Setting m_node_count to {0}'.format(instances))
   set_worker_node_instance_number(policy,instances)
   log.info('(C) Querying number of service replicas from Swarm starts')
@@ -208,7 +209,7 @@ def collect_inputs_for_nodes(policy):
   inputs={}
   node = policy.get('scaling',dict()).get('nodes',dict())
   config = pk_config.config()
-  inputs['m_nodes']=k8s.query_list_of_nodes(config['swarm_endpoint'])
+  inputs['m_nodes']=k8s.query_list_of_nodes(config['swarm_endpoint'], node['name'])
   mnc = node.get('outputs',dict()).get('m_node_count',None)
   inputs['m_node_count'] = max(min(int(mnc),int(node['max_instances'])),int(node['min_instances'])) if mnc else int(node['min_instances'])
 
@@ -242,7 +243,7 @@ def collect_inputs_for_containers(policy,service_name):
   inputs={}
   config = pk_config.config()
   node = policy.get('scaling',dict()).get('nodes',dict())
-  inputs['m_nodes']=k8s.query_list_of_nodes(config['swarm_endpoint'])
+  inputs['m_nodes']=k8s.query_list_of_nodes(config['swarm_endpoint'], node['name'])
   mnc = node.get('outputs',dict()).get('m_node_count',None)
   inputs['m_node_count'] = max(min(int(mnc),int(node['max_instances'])),int(node['min_instances'])) if mnc else int(node['min_instances'])
   for theservice in policy.get('scaling',dict()).get('services',dict()):
