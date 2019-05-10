@@ -93,6 +93,7 @@ def perform_policy_evaluation_on_worker_nodes(policy):
      inpvars[attrname]=attrvalue
    for attrname, attrvalue in policy.get('data',dict()).get('constants',dict()).iteritems():
      inpvars[attrname]=attrvalue
+   inpvars['m_opt_advice']=optim.calling_rest_api_advice
    if node.get('scaling_rule','') is not None:
      result = evaluator.evaluate(node.get('scaling_rule',''), inpvars, outvars)
      if 'outputs' not in node:
@@ -295,6 +296,11 @@ def perform_one_session(policy, results = None):
 
   log.info('(P) Policy evaluation for nodes starts')
   perform_policy_evaluation_on_worker_nodes(policy)
+  
+  #log.info('(O) Querying advice from the optimizer starts')
+  #ret = optim.calling_rest_api_advice()
+  #log.info('(O) Result of advice: {0}'.format(str(ret)))
+
   log.info('(S) Scaling of nodes starts')
   perform_worker_node_scaling(policy)
   for attrname, attrvalue in alerts.iteritems():

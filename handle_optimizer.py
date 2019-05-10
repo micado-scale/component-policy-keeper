@@ -205,3 +205,11 @@ def calling_rest_api_sample(sample=dict()):
   log.debug('Response: '+str(response))
   return
 
+def calling_rest_api_advice():
+  log=logging.getLogger('pk_optimizer')
+  config = pk_config.config()
+  url = config.get('optimizer_endpoint')+'/optimizer/advice'
+  log.debug('Calling optimizer REST API advice() method: '+url)
+  response = requests.get(url).json()
+  log.debug('Response: {0}'.format(response))
+  return response
