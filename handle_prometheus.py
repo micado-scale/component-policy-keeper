@@ -57,12 +57,14 @@ def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy):
     try:
       if scaling_rule_str is not None and scaling_rule_str.find(param) != -1:
         if pk_config.simulate():
-          continue
-        response = requests.get(endpoint+"/api/v1/query?query="+query).json()
-        log.debug('Prometheus response query "{0}":{1}'.format(query,response))
-        val = extract_value_from_prometheus_response(query,response,dict())
-        policy['data']['query_results'][param]=float(val)
-        queries[param]=float(val)
+          policy['data']['query_results'][param]=query
+          queries[param]=query
+	else:
+          response = requests.get(endpoint+"/api/v1/query?query="+query).json()
+          log.debug('Prometheus response query "{0}":{1}'.format(query,response))
+          val = extract_value_from_prometheus_response(query,response,dict())
+          policy['data']['query_results'][param]=float(val)
+          queries[param]=float(val)
     except Exception as e:
       policy['data']['query_results'][param]=None
       queries[param]=None
@@ -91,12 +93,14 @@ def evaluate_data_queries_and_alerts_for_a_service(endpoint,policy,servicename):
     try:
       if scaling_rule_str is not None and scaling_rule_str.find(param) != -1:
         if pk_config.simulate():
-          continue
-        response = requests.get(endpoint+"/api/v1/query?query="+query).json()
-        log.debug('Prometheus response query "{0}":{1}'.format(query,response))
-        val = extract_value_from_prometheus_response(query,response,dict())
-        policy['data']['query_results'][param]=float(val)
-        queries[param]=float(val)
+          policy['data']['query_results'][param]=query
+          queries[param]=query
+        else:
+          response = requests.get(endpoint+"/api/v1/query?query="+query).json()
+          log.debug('Prometheus response query "{0}":{1}'.format(query,response))
+          val = extract_value_from_prometheus_response(query,response,dict())
+          policy['data']['query_results'][param]=float(val)
+          queries[param]=float(val)
     except Exception as e:
       policy['data']['query_results'][param]=None
       queries[param]=None

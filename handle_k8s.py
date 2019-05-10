@@ -8,7 +8,11 @@ def query_list_of_nodes(endpoint,status='ready'):
   log=logging.getLogger('pk_k8s')
   list_of_nodes=[]
   if pk_config.simulate():
-    return dict()
+    a = {}
+    a['ID']='dummyID'
+    a['Addr']='127.0.0.1'
+    list_of_nodes.append(a.copy())
+    return list_of_nodes
   kubernetes.config.load_kube_config()
   client = kubernetes.client.CoreV1Api()
   try:
@@ -96,6 +100,8 @@ def down_nodes_cleanup_by_timeout(endpoint, stored, timeout):
 
 def down_nodes_maintenance(endpoint, down_nodes_timeout = 120):
   log=logging.getLogger('pk_k8s')
+  if pk_config.simulate():
+    return
   down_nodes_actual = query_list_of_nodes(endpoint,status='down')
   down_nodes_cleanup_by_list(down_nodes_stored, down_nodes_actual)
   down_nodes_add_from_list(down_nodes_stored, down_nodes_actual)

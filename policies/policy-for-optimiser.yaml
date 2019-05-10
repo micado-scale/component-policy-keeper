@@ -1,0 +1,26 @@
+stack: myexample
+data:
+  constants:
+    m_opt_init_VAR1: 1234
+    m_opt_init_VAR2: 5678
+  queries:
+    m_opt_input_MYVAR1: '(100-(avg(rate(node_cpu{group="worker_cluster",mode="idle"}[30s]))*100))'
+    m_opt_input_MYVAR2: '(100-(avg(rate(node_cpu{group="worker_cluster",mode="idle"}[60s]))*100))'
+    m_opt_target_query_MYTARGET1: '(100-(avg(rate(node_cpu{group="worker_cluster",mode="idle"}[120s]))*100))'
+    m_opt_target_minth_MYTARGET1: 5
+    m_opt_target_maxth_MYTARGET1: 10
+scaling:
+  nodes: 
+    min_instances: 1
+    max_instances: 5
+    scaling_rule: |
+      print('m_opt_init_VAR1:'+str(m_opt_init_VAR1))
+      print('m_opt_init_VAR2:'+str(m_opt_init_VAR2))
+      print('m_opt_input_MYVAR1:'+str(m_opt_input_MYVAR1))
+      print('m_opt_input_MYVAR2:'+str(m_opt_input_MYVAR2))
+      print('m_opt_target_query_MYTARGET1:'+str(m_opt_target_query_MYTARGET1))
+      print('m_opt_target_minth_MYTARGET1:'+str(m_opt_target_minth_MYTARGET1))
+      print('m_opt_target_maxth_MYTARGET1:'+str(m_opt_target_maxth_MYTARGET1))
+      print('End of scaling algorithm...')
+          
+        

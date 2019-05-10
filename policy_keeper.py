@@ -7,6 +7,7 @@ import shutil
 import handle_k8s as k8s
 import handle_occopus as occo
 import handle_prometheus as prom
+import handle_optimizer as optim
 import jinja2
 import logging
 import logging.config
@@ -129,6 +130,7 @@ def prepare_session(policy_yaml):
   policy_yaml = resolve_queries(policy_yaml)
   log.info('Resolved policy: \n{0}'.format(policy_yaml))
   policy = yaml.safe_load(policy_yaml)
+  #Initialize Prometheus
   log.info('(C) Add exporters to prometheus configuration file starts')
   config_tpl = config['prometheus_config_template']
   config_target = config['prometheus_config_target']
@@ -139,6 +141,7 @@ def prepare_session(policy_yaml):
                                       policy.get('stack','pk'))
   log.info('(C) Notify prometheus to reload config starts')
   prom.notify_to_reload_config(config['prometheus_endpoint'])
+  #Initialise nodes through Occopus
   log.info('(C) Querying number of target nodes from Occopus starts')
   instances = occo.query_number_of_worker_nodes(
                    endpoint=config['occopus_endpoint'],
@@ -146,6 +149,7 @@ def prepare_session(policy_yaml):
                    worker_name=config['occopus_worker_name'])
   log.info('(C) Setting m_node_count to {0}'.format(instances))
   set_worker_node_instance_number(policy,instances)
+  #Initialise service through K8S
   log.info('(C) Querying number of service replicas from Swarm starts')
   for theservice in policy.get('scaling',dict()).get('services',dict()):
     service_name = theservice.get('name','')
@@ -153,6 +157,11 @@ def prepare_session(policy_yaml):
     instances = k8s.query_k8s_replicas(config['k8s_endpoint'],full_service_name)
     log.info('(C) Setting m_container_count for {0} to {1}'.format(service_name, instances))
     set_k8s_instance_number(policy,service_name,instances)
+  #Initialise Optimizer
+  log.info('(O) Scanning the optimizer parameters starts...')
+  optim.collect_init_params_and_variables(policy)
+  log.info('(O) Initializing optimizer starts...')
+  optim.calling_rest_api_init() 
   return policy
 
 def add_query_results_and_alerts_to_nodes(policy, results):
@@ -278,6 +287,12 @@ def perform_one_session(policy, results = None):
     log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
   for attrname, attrvalue in alerts.iteritems():
     log.info('(A) => "{0}" is "{1}".'.format(attrname,attrvalue))
+
+  log.info('(O) Creating sample for the optimizer starts')
+  sample = optim.generate_sample(queries,inputs)
+  log.info('(O) Sending sample for the optimizer starts')
+  optim.calling_rest_api_sample(sample)
+
   log.info('(P) Policy evaluation for nodes starts')
   perform_policy_evaluation_on_worker_nodes(policy)
   log.info('(S) Scaling of nodes starts')
