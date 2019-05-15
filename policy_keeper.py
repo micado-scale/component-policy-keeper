@@ -131,6 +131,15 @@ def prepare_session(policy_yaml):
   policy_yaml = resolve_queries(policy_yaml)
   log.info('Resolved policy: \n{0}'.format(policy_yaml))
   policy = yaml.safe_load(policy_yaml)
+  #Set dryrun flags
+  log.info('(C) Initializing dryrun settings from policy starts')
+  pk_config.dryrun_set()
+  dryrun =  policy.get('data',dict()).get('constants',dict()).get('m_dryrun',None)
+  if type(dryrun) == list:
+    for comp in dryrun:
+      if comp in pk_config.var_dryrun_components:
+        pk_config.dryrun_set(comp,True)
+  log.info('(C) Enable dryrun for the following components: {0}'.format(pk_config.dryrun_get()))
   #Initialize Prometheus
   log.info('(C) Add exporters to prometheus configuration file starts')
   config_tpl = config['prometheus_config_template']

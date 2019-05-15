@@ -14,6 +14,7 @@ DEFAULT_prestr_target_maxth = 'maxth_'
 
 m_opt_init_params = dict()
 m_opt_variables = list()
+m_opt_dummy_advice = dict(valid='False',phase='training',vmnumber=0,errmsg='Optimizer is disabled! (dryrun)',confident=0)
 
 """
 Description of the DATA STRUCTURES
@@ -139,6 +140,9 @@ def insert_target_structure(m_opt_init_params,key,value):
 def collect_init_params_and_variables(policy):
   log=logging.getLogger('pk_optimizer')
   config = pk_config.config()
+  if pk_config.dryrun_get('optimizer'):
+    log.info('(O) DRYRUN enabled. Skipping...')
+    return
   reset_variables()
   m_opt_init_params['constants'] = dict()
   for varname,value in policy.get('data',dict()).get('constants',dict()).iteritems():
@@ -164,6 +168,9 @@ def collect_init_params_and_variables(policy):
 def calling_rest_api_init():
   log=logging.getLogger('pk_optimizer')
   config = pk_config.config()
+  if pk_config.dryrun_get('optimizer'):
+    log.info('(O) DRYRUN enabled. Skipping...')
+    return
   url = config.get('optimizer_endpoint')+'/optimizer/init'
   log.debug('Calling optimizer REST API init() method: '+url)
   response = requests.post(url, data=yaml.dump(m_opt_init_params))
@@ -172,6 +179,9 @@ def calling_rest_api_init():
 
 def generate_sample(userqueries=dict(),sysqueries=dict()):
   log=logging.getLogger('pk_optimizer')
+  if pk_config.dryrun_get('optimizer'):
+    log.info('(O) DRYRUN enabled. Skipping...')
+    return dict()
   log.debug('ALLQUERIES: {0}'.format(str(userqueries)))
   log.debug('SYSQUERIES: {0}'.format(str(sysqueries)))
   sample = dict()
@@ -199,6 +209,9 @@ def generate_sample(userqueries=dict(),sysqueries=dict()):
 def calling_rest_api_sample(sample=dict()):
   log=logging.getLogger('pk_optimizer')
   config = pk_config.config()
+  if pk_config.dryrun_get('optimizer'):
+    log.info('(O) DRYRUN enabled. Skipping...')
+    return 
   url = config.get('optimizer_endpoint')+'/optimizer/sample'
   log.debug('Calling optimizer REST API sample() method: '+url)
   response = requests.post(url, data=yaml.dump(sample))
@@ -207,6 +220,8 @@ def calling_rest_api_sample(sample=dict()):
 
 def calling_rest_api_advice():
   log=logging.getLogger('pk_optimizer')
+  if pk_config.dryrun_get('optimizer'):
+    return m_opt_dummy_advice
   config = pk_config.config()
   url = config.get('optimizer_endpoint')+'/optimizer/advice'
   log.debug('Calling optimizer REST API advice() method: '+url)
