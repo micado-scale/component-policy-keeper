@@ -305,11 +305,6 @@ def perform_one_session(policy, results = None):
 
   log.info('(P) Policy evaluation for nodes starts')
   perform_policy_evaluation_on_worker_nodes(policy)
-  
-  #log.info('(O) Querying advice from the optimizer starts')
-  #ret = optim.calling_rest_api_advice()
-  #log.info('(O) Result of advice: {0}'.format(str(ret)))
-
   log.info('(S) Scaling of nodes starts')
   perform_worker_node_scaling(policy)
   for attrname, attrvalue in alerts.iteritems():

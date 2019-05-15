@@ -15,6 +15,7 @@ DEFAULT_prestr_target_maxth = 'maxth_'
 m_opt_init_params = dict()
 m_opt_variables = list()
 m_opt_dummy_advice = dict(valid='False',phase='training',vmnumber=0,errmsg='Optimizer is disabled! (dryrun)',confident=0)
+m_opt_accessible = True
 
 """
 Description of the DATA STRUCTURES
@@ -166,6 +167,7 @@ def collect_init_params_and_variables(policy):
   return
 
 def calling_rest_api_init():
+  global m_opt_accessible
   log=logging.getLogger('pk_optimizer')
   config = pk_config.config()
   if pk_config.dryrun_get('optimizer'):
@@ -173,7 +175,14 @@ def calling_rest_api_init():
     return
   url = config.get('optimizer_endpoint')+'/optimizer/init'
   log.debug('Calling optimizer REST API init() method: '+url)
-  response = requests.post(url, data=yaml.dump(m_opt_init_params))
+  try:
+    response = requests.post(url, data=yaml.dump(m_opt_init_params))
+    m_opt_accessible = True
+  except Exception as e:
+    m_opt_accessible = False
+    log.exception('(O) Calling optimizer REST API init() method raised exception: ')
+    log.info('(O) WARNING: Optimizer is disabled for the current policy.')
+    return
   log.debug('Response: '+str(response))
   return
 
@@ -181,6 +190,8 @@ def generate_sample(userqueries=dict(),sysqueries=dict()):
   log=logging.getLogger('pk_optimizer')
   if pk_config.dryrun_get('optimizer'):
     log.info('(O) DRYRUN enabled. Skipping...')
+    return dict()
+  if not m_opt_accessible:
     return dict()
   log.debug('ALLQUERIES: {0}'.format(str(userqueries)))
   log.debug('SYSQUERIES: {0}'.format(str(sysqueries)))
@@ -212,6 +223,8 @@ def calling_rest_api_sample(sample=dict()):
   if pk_config.dryrun_get('optimizer'):
     log.info('(O) DRYRUN enabled. Skipping...')
     return 
+  if not m_opt_accessible:
+    return
   url = config.get('optimizer_endpoint')+'/optimizer/sample'
   log.debug('Calling optimizer REST API sample() method: '+url)
   response = requests.post(url, data=yaml.dump(sample))
@@ -220,7 +233,7 @@ def calling_rest_api_sample(sample=dict()):
 
 def calling_rest_api_advice():
   log=logging.getLogger('pk_optimizer')
-  if pk_config.dryrun_get('optimizer'):
+  if pk_config.dryrun_get('optimizer') or not m_opt_accessible:
     return m_opt_dummy_advice
   config = pk_config.config()
   url = config.get('optimizer_endpoint')+'/optimizer/advice'
