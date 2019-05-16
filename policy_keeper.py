@@ -438,7 +438,8 @@ def pkmain():
   if args.cfg_srv:
     if args.cfg_policy:
       log.warning('Policy file in parameter is unsused, must be defined through the API in service mode!')
-    pk_rest.init_service()
+    pk_rest.init_logging()
+    evaluator.init_logging()
     pk_rest.app.run(debug=True,
                     host=args.host,
                     port=args.port)

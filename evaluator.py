@@ -1,8 +1,33 @@
 import sys
 import time
 import multiprocessing
+from multiprocessing.queues import Queue
 import copy
 from asteval import Interpreter, make_symbol_table
+from threading import Thread
+import logging
+
+log = None
+
+def init_logging():
+  global log 
+  log = logging.getLogger('pk_usercode')
+
+def text_catcher(queue):
+  while True:
+    str=queue.get().rstrip()
+    if str!='':
+      log.info('(USER CODE):{0}'.format(str))
+
+class StdoutQueue(Queue):
+    def __init__(self,*args,**kwargs):
+        Queue.__init__(self,*args,**kwargs)
+
+    def write(self,msg):
+        self.put(msg)
+
+    def flush(self):
+        sys.__stdout__.flush()
 
 class TimeoutException(Exception):
     """ It took too long to compile and execute. """
@@ -12,15 +37,18 @@ class RunnableProcessing(multiprocessing.Process):
 
     Pass back any exception received.
     """
-    def __init__(self, func, *args, **kwargs):
+    def __init__(self, func, q, *args, **kwargs):
         self.queue = multiprocessing.Queue(maxsize=1)
-        args = (func,) + args
-        multiprocessing.Process.__init__(self, target=self.run_func, 
+        args = (func, q, ) + args
+        multiprocessing.Process.__init__(self, target=self.run_func,
             args=args, kwargs=kwargs)
+        
 
-    def run_func(self, func, *args, **kwargs):
+    def run_func(self, func, q, *args, **kwargs):
         try:
-            result = func(*args, **kwargs)
+            sys.stdout = q
+            #print("RUN_FUNC:"+str(func)+str(args))
+            result = func(q, *args, **kwargs)
             self.queue.put((True, result))
         except Exception as e:
             self.queue.put((False, e))
@@ -39,8 +67,14 @@ def timeout(seconds, force_kill=True):
     """
     def wrapper(function):
         def inner(*args, **kwargs):
+
+            q = StdoutQueue()
+            monitor = Thread(target=text_catcher,args=(q,))
+            monitor.daemon = True
+            monitor.start()
+
             now = time.time()
-            proc = RunnableProcessing(function, *args, **kwargs)
+            proc = RunnableProcessing(function, q, *args, **kwargs)
             proc.start()
             proc.join(seconds)
             if proc.is_alive():
@@ -49,17 +83,19 @@ def timeout(seconds, force_kill=True):
                 runtime = time.time() - now
                 raise TimeoutException('timed out after {0} seconds'.format(runtime))
             assert proc.done()
+            #monitor.terminate()
             success, result = proc.result()
             if success:
                 return result
             else:
                 raise result
+            monitor.join()
         return inner
     return wrapper
 
 
-@timeout(3)
-def evaluate(eval_code, input_variables={}, output_variables=[]):
+@timeout(10)
+def evaluate(q, eval_code, input_variables={}, output_variables=[]):
     """Evaluates a given expression, with the timeout given as decorator.
 
     Args:
@@ -74,7 +110,10 @@ def evaluate(eval_code, input_variables={}, output_variables=[]):
     # FIXME: use_numpy the process blocks infinitely at the return statement
     import time
     sym = make_symbol_table(time=time, use_numpy=True, range=range, **input_variables)
+    #print("SYMTABLE:"+str(sym))
     aeval = Interpreter(
+        writer = q,
+        err_writer = q,
         symtable = sym,
         use_numpy = True,
         no_if = False,
@@ -89,8 +128,12 @@ def evaluate(eval_code, input_variables={}, output_variables=[]):
         no_delete = True,
         no_raise = True,
         no_print = False)
+
+
     aeval(eval_code)
     symtable = {x: sym[x] for x in sym if x in output_variables}
+
+    
     return symtable
 
 

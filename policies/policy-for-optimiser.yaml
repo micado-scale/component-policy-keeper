@@ -1,7 +1,6 @@
 stack: myexample
 data:
   constants:
-    m_dryrun: ['optimizer']
     m_opt_init_VAR1: 1234
     m_opt_init_VAR2: 5678
     m_opt_init_training_samples_required: 5

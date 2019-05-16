@@ -174,7 +174,7 @@ def calling_rest_api_init():
     log.info('(O) DRYRUN enabled. Skipping...')
     return
   url = config.get('optimizer_endpoint')+'/optimizer/init'
-  log.debug('Calling optimizer REST API init() method: '+url)
+  log.debug('(O) Calling optimizer REST API init() method: '+url)
   try:
     response = requests.post(url, data=yaml.dump(m_opt_init_params))
     m_opt_accessible = True
@@ -183,7 +183,7 @@ def calling_rest_api_init():
     log.exception('(O) Calling optimizer REST API init() method raised exception: ')
     log.info('(O) WARNING: Optimizer is disabled for the current policy.')
     return
-  log.debug('Response: '+str(response))
+  log.debug('(O) Response: '+str(response))
   return
 
 def generate_sample(userqueries=dict(),sysqueries=dict()):
@@ -193,8 +193,8 @@ def generate_sample(userqueries=dict(),sysqueries=dict()):
     return dict()
   if not m_opt_accessible:
     return dict()
-  log.debug('ALLQUERIES: {0}'.format(str(userqueries)))
-  log.debug('SYSQUERIES: {0}'.format(str(sysqueries)))
+  log.debug('(O) ALLQUERIES: {0}'.format(str(userqueries)))
+  log.debug('(O) SYSQUERIES: {0}'.format(str(sysqueries)))
   sample = dict()
   sample['sample']=dict()
   sample['sample']['input_metrics']=[]
@@ -226,9 +226,9 @@ def calling_rest_api_sample(sample=dict()):
   if not m_opt_accessible:
     return
   url = config.get('optimizer_endpoint')+'/optimizer/sample'
-  log.debug('Calling optimizer REST API sample() method: '+url)
+  log.debug('(O) Calling optimizer REST API sample() method: '+url)
   response = requests.post(url, data=yaml.dump(sample))
-  log.debug('Response: '+str(response))
+  log.debug('(O) Response: '+str(response))
   return
 
 def calling_rest_api_advice():
@@ -237,7 +237,7 @@ def calling_rest_api_advice():
     return m_opt_dummy_advice
   config = pk_config.config()
   url = config.get('optimizer_endpoint')+'/optimizer/advice'
-  log.debug('Calling optimizer REST API advice() method: '+url)
+  log.debug('(O) Calling optimizer REST API advice() method: '+url)
   response = requests.get(url).json()
-  log.debug('Response: {0}'.format(response))
+  log.debug('(O) Response: {0}'.format(response))
   return response
