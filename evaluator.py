@@ -17,7 +17,7 @@ def text_catcher(queue):
   while True:
     str=queue.get().rstrip()
     if str!='':
-      log.info('(USER CODE):{0}'.format(str))
+      log.info(str)
 
 class StdoutQueue(Queue):
     def __init__(self,*args,**kwargs):
@@ -67,6 +67,8 @@ def timeout(seconds, force_kill=True):
     """
     def wrapper(function):
         def inner(*args, **kwargs):
+            log.info('==== [{0}] Executing the user defined algorithm starts... ===='
+                     .format(time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())))
 
             q = StdoutQueue()
             monitor = Thread(target=text_catcher,args=(q,))
@@ -83,13 +85,13 @@ def timeout(seconds, force_kill=True):
                 runtime = time.time() - now
                 raise TimeoutException('timed out after {0} seconds'.format(runtime))
             assert proc.done()
-            #monitor.terminate()
+            log.info('==== [{0}] Executing the user defined algorithm finished. ===='
+                     .format(time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())))
             success, result = proc.result()
             if success:
                 return result
             else:
                 raise result
-            monitor.join()
         return inner
     return wrapper
 

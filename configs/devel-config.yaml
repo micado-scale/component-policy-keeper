@@ -30,6 +30,8 @@ logging:
         simpleFormatter:
             #format: "%(module)s %(asctime)s %(levelname)s %(message)s"
             format: "%(asctime)s %(levelname)s %(message)s"
+        usercodeFormatter:
+            format: "%(message)s"
     handlers:
         console:
             class: logging.StreamHandler
@@ -44,7 +46,7 @@ logging:
             filename: pk.log
         file_usercode:
             class : logging.FileHandler
-            formatter: simpleFormatter
+            formatter: usercodeFormatter
             mode: w
             level: DEBUG
             filename: pk_usercode.log
