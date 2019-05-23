@@ -79,7 +79,7 @@ def perform_policy_evaluation_on_a_k8s_deploy(policy,service_name):
          srv['outputs']={}
        srv['outputs']['m_container_count']=int(result.get('m_container_count',srv['inputs']['m_container_count']))
        policy['scaling']['userdata']=result.get('m_userdata',None)
-     log.info('(P) => m_container_count: {0}'.format(int(srv.get('outputs',dict()).get('m_container_count',0))))
+     log.info('(P)   => m_container_count: {0}'.format(int(srv.get('outputs',dict()).get('m_container_count',0))))
    return
 
 def perform_policy_evaluation_on_worker_nodes(policy):
@@ -100,7 +100,7 @@ def perform_policy_evaluation_on_worker_nodes(policy):
        node['outputs']={}
      node['outputs']['m_node_count']=int(result.get('m_node_count',node['inputs']['m_node_count']))
      policy['scaling']['userdata']=result.get('m_userdata',None)
-   log.info('(P) => m_node_count: {0}'.format(int(node.get('outputs',dict()).get('m_node_count',0))))
+   log.info('(P)   => m_node_count: {0}'.format(int(node.get('outputs',dict()).get('m_node_count',0))))
    return
 
 def load_policy_from_file(policyfile):
@@ -152,20 +152,20 @@ def prepare_session(policy_yaml):
   log.info('(C) Notify prometheus to reload config starts')
   prom.notify_to_reload_config(config['prometheus_endpoint'])
   #Initialise nodes through Occopus
-  log.info('(C) Querying number of target nodes from Occopus starts')
+  log.info('(C) Querying number of worker nodes from Occopus starts')
   instances = occo.query_number_of_worker_nodes(
                    endpoint=config['occopus_endpoint'],
                    infra_name=config['occopus_infra_name'],
                    worker_name=config['occopus_worker_name'])
-  log.info('(C) Setting m_node_count to {0}'.format(instances))
+  log.info('(C)   Setting m_node_count to {0}'.format(instances))
   set_worker_node_instance_number(policy,instances)
   #Initialise service through K8S
-  log.info('(C) Querying number of service replicas from Swarm starts')
+  log.info('(C) Querying number of containers starts')
   for theservice in policy.get('scaling',dict()).get('services',dict()):
     service_name = theservice.get('name','')
     full_service_name = get_full_service_name(policy, service_name)
     instances = k8s.query_k8s_replicas(config['k8s_endpoint'],full_service_name)
-    log.info('(C) Setting m_container_count for {0} to {1}'.format(service_name, instances))
+    log.info('(C)   Setting m_container_count for {0} to {1}'.format(service_name, instances))
     set_k8s_instance_number(policy,service_name,instances)
   #Initialise Optimizer
   log.info('(O) Scanning the optimizer parameters starts...')
@@ -287,16 +287,16 @@ def perform_one_session(policy, results = None):
   inputs = collect_inputs_for_nodes(policy)
   set_policy_inputs_for_nodes(policy,inputs)
   for x in inputs.keys():
-    log.info('(I) => "{0}": {1}'.format(x,inputs[x]))
+    log.info('(I)   => "{0}": {1}'.format(x,inputs[x]))
   log.info('(Q) Evaluating queries and alerts for nodes starts')
   if results:
     queries, alerts = add_query_results_and_alerts_to_nodes(policy, results)
   else:
     queries, alerts = prom.evaluate_data_queries_and_alerts_for_nodes(config['prometheus_endpoint'],policy)
   for attrname, attrvalue in queries.iteritems():
-    log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
+    log.info('(Q)   => "{0}" is "{1}".'.format(attrname,attrvalue))
   for attrname, attrvalue in alerts.iteritems():
-    log.info('(A) => "{0}" is "{1}".'.format(attrname,attrvalue))
+    log.info('(A)   => "{0}" is "{1}".'.format(attrname,attrvalue))
 
   log.info('(O) Creating sample for the optimizer starts')
   sample = optim.generate_sample(queries,inputs)
@@ -316,7 +316,7 @@ def perform_one_session(policy, results = None):
     inputs = collect_inputs_for_containers(policy,service_name)
     set_policy_inputs_for_containers(policy,service_name,inputs)
     for x in inputs.keys():
-      log.info('(I) => "{0}": {1}'.format(x,inputs[x]))
+      log.info('(I)   => "{0}": {1}'.format(x,inputs[x]))
     log.info('(Q) Evaluating queries and alerts for service "{0}" starts'.format(service_name))
     if results:
       queries, alerts = add_query_results_and_alerts_to_service(policy, results, service_name)
@@ -324,9 +324,9 @@ def perform_one_session(policy, results = None):
       queries, alerts = prom.evaluate_data_queries_and_alerts_for_a_service(
                              config['prometheus_endpoint'],policy,service_name)
     for attrname, attrvalue in queries.iteritems():
-      log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
+      log.info('(Q)   => "{0}" is "{1}".'.format(attrname,attrvalue))
     for attrname, attrvalue in alerts.iteritems():
-      log.info('(A) => "{0}" is "{1}".'.format(attrname,attrvalue))
+      log.info('(A)   => "{0}" is "{1}".'.format(attrname,attrvalue))
     log.info('(P) Policy evaluation for service "{0}" starts'.format(service_name))
     perform_policy_evaluation_on_a_k8s_deploy(policy,service_name)
     log.info('(S) Scaling of service "{0}" starts'.format(service_name))
@@ -388,11 +388,6 @@ def pkmain():
                       dest='cfg_srv',
                       default=False,
                       help='run in service mode')
-  parser.add_argument('--simulate',
-                      action='store_true',
-                      dest='cfg_simulate',
-                      default=False,
-                      help='ommit manipulating surrounding components')
   parser.add_argument('--host',
                       type=str,
                       default='127.0.0.1',
@@ -415,10 +410,6 @@ def pkmain():
     log = logging.getLogger('pk')
   except Exception as e:
     print 'ERROR: Cannot process configuration file "{0}": {1}'.format(args.cfg_path,str(e))
-  #set simulate mode
-  pk_config.simulate(args.cfg_simulate)
-  if args.cfg_simulate:
-    log.warning('SIMULATION mode is active! No changes will be performed.')
   #read policy file and start periodic policy evaluation in case of command-line mode
   if not args.cfg_srv:
     if not args.cfg_policy:

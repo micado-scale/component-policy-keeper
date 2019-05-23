@@ -2,7 +2,6 @@
 var_config = None
 var_policy = None
 var_finish_scaling = False
-var_simulate = False
 var_dryrun = []
 var_dryrun_components = ['occopus','k8s','prometheus','optimizer']
 
@@ -17,12 +16,6 @@ def finish_scaling(fs = None):
   if fs is not None:
     var_finish_scaling = fs
   return var_finish_scaling
-
-def simulate(sim = None):
-  global var_simulate
-  if sim is not None:
-    var_simulate = sim
-  return var_simulate
 
 def policy(pol = None):
   global var_policy

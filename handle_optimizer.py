@@ -16,6 +16,7 @@ m_opt_init_params = dict()
 m_opt_variables = list()
 m_opt_dummy_advice = dict(valid='False',phase='training',vmnumber=0,errmsg='Optimizer is disabled! (dryrun)',confident=0)
 m_opt_accessible = True
+dryrun_id = 'optimizer'
 
 """
 Description of the DATA STRUCTURES
@@ -126,7 +127,7 @@ def insert_target_structure(m_opt_init_params,key,value):
     varname=key[len(prestr_target_maxth):]
     fieldname='max_threshold'
   if varname and fieldname:
-    log.info('(O) => TARGET: {0}/{1}:{2}'.format(varname,fieldname,value))
+    log.info('(O)   => TARGET: {0}/{1}:{2}'.format(varname,fieldname,value))
     for atarget in m_opt_init_params['constants']['target_metrics']:
       if atarget['name']==varname:
         if fieldname!='name':
@@ -141,21 +142,21 @@ def insert_target_structure(m_opt_init_params,key,value):
 def collect_init_params_and_variables(policy):
   log=logging.getLogger('pk_optimizer')
   config = pk_config.config()
-  if pk_config.dryrun_get('optimizer'):
-    log.info('(O) DRYRUN enabled. Skipping...')
+  if pk_config.dryrun_get(dryrun_id):
+    log.info('(O)   DRYRUN enabled. Skipping...')
     return
   reset_variables()
   m_opt_init_params['constants'] = dict()
   for varname,value in policy.get('data',dict()).get('constants',dict()).iteritems():
     retvarname = varname_if_init(varname)
     if retvarname:
-      log.info('(O) => INIT: {0}:{1}'.format(retvarname,value))
+      log.info('(O)   => INIT: {0}:{1}'.format(retvarname,value))
       m_opt_init_params['constants'][retvarname]=value
   m_opt_init_params['constants']['input_metrics']=list()
   for varname,query in policy.get('data',dict()).get('queries',dict()).iteritems():
     retvarname = varname_if_input(varname)
     if retvarname:
-      log.info('(O) => INPUT: {0}:{1}'.format(retvarname,query))
+      log.info('(O)   => INPUT: {0}:{1}'.format(retvarname,query))
       m_opt_init_params['constants']['input_metrics'].append(dict(name=retvarname))
       m_opt_variables.append(dict(lname=varname,sname=retvarname,query=query))
   m_opt_init_params['constants']['target_metrics']=list()
@@ -170,8 +171,8 @@ def calling_rest_api_init():
   global m_opt_accessible
   log=logging.getLogger('pk_optimizer')
   config = pk_config.config()
-  if pk_config.dryrun_get('optimizer'):
-    log.info('(O) DRYRUN enabled. Skipping...')
+  if pk_config.dryrun_get(dryrun_id):
+    log.info('(O)   DRYRUN enabled. Skipping...')
     return
   url = config.get('optimizer_endpoint')+'/optimizer/init'
   log.debug('(O) Calling optimizer REST API init() method: '+url)
@@ -188,8 +189,8 @@ def calling_rest_api_init():
 
 def generate_sample(userqueries=dict(),sysqueries=dict()):
   log=logging.getLogger('pk_optimizer')
-  if pk_config.dryrun_get('optimizer'):
-    log.info('(O) DRYRUN enabled. Skipping...')
+  if pk_config.dryrun_get(dryrun_id):
+    log.info('(O)   DRYRUN enabled. Skipping...')
     return dict()
   if not m_opt_accessible:
     return dict()
@@ -201,7 +202,7 @@ def generate_sample(userqueries=dict(),sysqueries=dict()):
   sample['sample']['target_metrics']=[]
 
   for var in m_opt_variables:
-    log.debug('(O) => Scanning1 {0} ...'.format(var['lname']))
+    log.debug('(O)   => Scanning1 {0} ...'.format(var['lname']))
     onesample=dict()
     onesample['name']=var['sname']
     onesample['value']=None
@@ -220,8 +221,8 @@ def generate_sample(userqueries=dict(),sysqueries=dict()):
 def calling_rest_api_sample(sample=dict()):
   log=logging.getLogger('pk_optimizer')
   config = pk_config.config()
-  if pk_config.dryrun_get('optimizer'):
-    log.info('(O) DRYRUN enabled. Skipping...')
+  if pk_config.dryrun_get(dryrun_id):
+    log.info('(O)   DRYRUN enabled. Skipping...')
     return 
   if not m_opt_accessible:
     return
@@ -233,7 +234,7 @@ def calling_rest_api_sample(sample=dict()):
 
 def calling_rest_api_advice():
   log=logging.getLogger('pk_optimizer')
-  if pk_config.dryrun_get('optimizer') or not m_opt_accessible:
+  if pk_config.dryrun_get(dryrun_id) or not m_opt_accessible:
     return m_opt_dummy_advice
   config = pk_config.config()
   url = config.get('optimizer_endpoint')+'/optimizer/advice'

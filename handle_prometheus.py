@@ -6,6 +6,7 @@ import shutil,os
 import pk_config
 
 alerts = {}
+dryrun_id = 'prometheus'
 
 def is_subdict(subdict=dict(),maindict=dict()):
   return all((k in maindict and maindict[k]==v) for k,v in subdict.iteritems())
@@ -47,6 +48,8 @@ def filter_data_queries_by_scaling_rule(queries,scaling_rule):
 
 def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy):
   log=logging.getLogger('pk_prometheus')
+  if pk_config.dryrun_get(dryrun_id):
+    log.info('(Q)   DRYRUN enabled. Skipping...')
   queries, alerts = dict(), dict()
   if 'data' not in policy:
     policy['data']={}
@@ -56,7 +59,7 @@ def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy):
   for param,query in policy.get('data',dict()).get('queries',dict()).iteritems():
     try:
       if scaling_rule_str is not None and scaling_rule_str.find(param) != -1:
-        if pk_config.simulate():
+        if pk_config.dryrun_get(dryrun_id):
           policy['data']['query_results'][param]=query
           queries[param]=query
 	else:
@@ -83,6 +86,8 @@ def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy):
 
 def evaluate_data_queries_and_alerts_for_a_service(endpoint,policy,servicename):
   log=logging.getLogger('pk_prometheus')
+  if pk_config.dryrun_get(dryrun_id):
+    log.info('(Q)   DRYRUN enabled. Skipping...')
   queries, alerts = dict(), dict()
   if 'query_results' not in policy['data']:
     policy['data']['query_results']=dict()
@@ -92,7 +97,7 @@ def evaluate_data_queries_and_alerts_for_a_service(endpoint,policy,servicename):
   for param,query in policy.get('data',dict()).get('queries',dict()).iteritems():
     try:
       if scaling_rule_str is not None and scaling_rule_str.find(param) != -1:
-        if pk_config.simulate():
+        if pk_config.dryrun_get(dryrun_id):
           policy['data']['query_results'][param]=query
           queries[param]=query
         else:
@@ -121,10 +126,12 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
   log=logging.getLogger('pk_prometheus')
   try:
     config_content = dict()
-    if not pk_config.simulate():
-      shutil.copy(config_file, template_file)
-      with open(template_file,'r') as f:
-        config_content = yaml.round_trip_load(f)
+    if pk_config.dryrun_get(dryrun_id):
+      log.info('(C)   DRYRUN enabled. Skipping...')
+      return
+    shutil.copy(config_file, template_file)
+    with open(template_file,'r') as f:
+      config_content = yaml.round_trip_load(f)
     if 'scrape_configs' not in config_content:
       config_content['scrape_configs']=[]
     #Find proper scrape_config or create
@@ -171,11 +178,11 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
         else:
           static_config['targets'].append(exporter_endpoint)
         config_changed = True
-        log.info('(C) => exporter "{0}" added to config'.format(exporter_endpoint))
+        log.info('(C)   => exporter "{0}" added to config'.format(exporter_endpoint))
       else:
-        log.info('(C) => exporter "{0}" skipped, already part of config'.format(exporter_endpoint))
+        log.info('(C)   => exporter "{0}" skipped, already part of config'.format(exporter_endpoint))
 
-    if config_changed and not pk_config.simulate():
+    if config_changed:
       with open(config_file, 'w') as outfile:
         yaml.round_trip_dump(config_content, outfile, default_flow_style=False)
 
@@ -185,14 +192,19 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
   return
 
 def remove_exporters_from_prometheus_config(template_file, config_file):
-  if not pk_config.simulate():
-    shutil.copyfile(template_file, config_file)
+  log=logging.getLogger('pk_prometheus')
+  if pk_config.dryrun_get(dryrun_id):
+    log.info('(C)   DRYRUN enabled. Skipping...')
+    return
+  shutil.copyfile(template_file, config_file)
 
 def notify_to_reload_config(endpoint):
   log=logging.getLogger('pk_prometheus')
+  if pk_config.dryrun_get(dryrun_id):
+    log.info('(C)   DRYRUN enabled. Skipping...')
+    return
   try:
-    if not pk_config.simulate():
-      requests.post(endpoint+"/-/reload")
+    requests.post(endpoint+"/-/reload")
     log.info('(C) Notification to reload config sent to Prometheus.')
   except Exception:
     log.exception('Sending config reload notification to Prometheus failed:')
@@ -202,29 +214,33 @@ def notify_to_reload_config(endpoint):
 '''
 
 def deploy_alerts_under_prometheus(rules_directory,alerts,stack):
+  log=logging.getLogger('pk_prometheus')
+  if pk_config.dryrun_get(dryrun_id):
+    log.info('(C)   DRYRUN enabled. Skipping...')
+    return
   if not alerts:
     return
-  log=logging.getLogger('pk_prometheus')
   try:
     content={'groups': [ { 'name': 'micado', 'rules' : [] } ] }
     for alert in alerts:
       content['groups'][0]['rules'].append(dict(alert))
     rule_file=os.path.join(rules_directory,stack+'.rules')
-    if not pk_config.simulate():
-      with open(rule_file, 'w') as outfile:
-        yaml.round_trip_dump(content, outfile, default_flow_style=False)
+    with open(rule_file, 'w') as outfile:
+      yaml.round_trip_dump(content, outfile, default_flow_style=False)
   except Exception:
     log.exception('Deploying alerts under Prometheus failed:')
   return
 
 def remove_alerts_under_prometheus(rules_directory,alerts,stack):
+  log=logging.getLogger('pk_prometheus')
+  if pk_config.dryrun_get(dryrun_id):
+    log.info('(C)   DRYRUN enabled. Skipping...')
+    return
   if not alerts:
     return
-  log=logging.getLogger('pk_prometheus')
   try:
     rule_file=os.path.join(rules_directory,stack+'.rules')
-    if not pk_config.simulate():
-      os.remove(rule_file)
+    os.remove(rule_file)
   except Exception:
     log.exception('Removing alerts under Prometheus failed:')
   return

@@ -1,6 +1,7 @@
 stack: myexample
 data:
   constants:
+    m_dryrun: ['prometheus','optimizer','occopus','k8s']
     m_opt_init_VAR1: 1234
     m_opt_init_VAR2: 5678
     m_opt_init_training_samples_required: 5
@@ -25,6 +26,11 @@ scaling:
       print('  ADVICE.confident: '+str(adv['confident']))
       print('  ADVICE.errmsg: '+str(adv['errmsg']))
       print('End of scaling algorithm.')
+  services:
+    - name: "worker"
+      min_instances: 1
+      max_instances: 10
+  
       
           
         
