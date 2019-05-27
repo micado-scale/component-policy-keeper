@@ -118,6 +118,7 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
   try:
     config_content = dict()
     if not pk_config.simulate():
+      shutil.copy(config_file, template_file)
       with open(template_file,'r') as f:
         config_content = yaml.round_trip_load(f)
     if 'scrape_configs' not in config_content:
