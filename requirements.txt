@@ -10,7 +10,7 @@ get==0.0.39
 idna==2.6
 ipaddress==1.0.19
 itsdangerous==0.24
-Jinja2==2.10
+Jinja2==2.10.1
 kubernetes==8.0.1
 MarkupSafe==1.0
 numpy==1.14.0
@@ -22,6 +22,6 @@ requests==2.20.0
 ruamel.ordereddict==0.4.13
 ruamel.yaml==0.15.35
 six==1.11.0
-urllib3==1.24.1
+urllib3==1.24.2
 websocket-client==0.46.0
 Werkzeug==0.14.1
