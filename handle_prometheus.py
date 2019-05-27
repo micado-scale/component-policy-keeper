@@ -45,14 +45,14 @@ def filter_data_queries_by_scaling_rule(queries,scaling_rule):
     if scaling_rule.find(param)!= -1:
       result[param]=query
 
-def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy):
+def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy,node):
   log=logging.getLogger('pk_prometheus')
   queries, alerts = dict(), dict()
   if 'data' not in policy:
     policy['data']={}
   if 'query_results' not in policy['data']:
     policy['data']['query_results']=dict()
-  scaling_rule_str = policy.get('scaling',dict()).get('nodes',dict()).get('scaling_rule','')
+  scaling_rule_str = node.get('scaling_rule','')
   for param,query in policy.get('data',dict()).get('queries',dict()).iteritems():
     try:
       if scaling_rule_str is not None and scaling_rule_str.find(param) != -1:
