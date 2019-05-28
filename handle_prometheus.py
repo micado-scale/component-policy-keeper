@@ -157,12 +157,12 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
           if old_label:
             old_label = old_label[0]
             old_regex = old_label.get('regex')
-            new_regex = '{}|.*{}'.format(old_regex, exp[1])
+            new_regex = '{}|{}:{}'.format(old_regex, exp[0], exp[1])
             old_label['regex'] = new_regex
           else:
-            label = {'source_labels': ['__address__'],
+            label = {'source_labels': ['instance'],
                      'action': 'keep',
-                     'regex': '.*{}'.format(exp[1])}
+                     'regex': '{}:{}'.format(exp[0], exp[1])}
             relabel.append(label)
         else:
           static_config['targets'].append(exporter_endpoint)
