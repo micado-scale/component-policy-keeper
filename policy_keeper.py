@@ -246,9 +246,9 @@ def collect_inputs_for_containers(policy,service_name):
       for node in nodes:
         if not theservice.get('hosts') or node['name'] in theservice.get('hosts', []):
           inputs['m_nodes']+=k8s.query_list_of_nodes(config['k8s_endpoint'], node['name'])
-          mnc += node.get('outputs',dict()).get('m_node_count',None)
-          mini += node['min_instances']
-          maxi += node['max_instances']
+          mnc += int(node.get('outputs',dict()).get('m_node_count',None))
+          mini += int(node['min_instances'])
+          maxi += int(node['max_instances'])
       inputs['m_node_count'] = max(min(int(mnc),int(maxi)),int(mini)) if mnc else int(mini)
       mcc = theservice.get('outputs',dict()).get('m_container_count',None)
       inputs['m_container_count'] = max(min(int(mcc),int(theservice['max_instances'])),int(theservice['min_instances']))\
