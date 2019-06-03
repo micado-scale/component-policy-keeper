@@ -44,19 +44,18 @@ def perform_service_scaling(policy,service_name):
         containercount = max(min(int(srv['outputs']['m_container_count']),int(srv['max_instances'])),int(srv['min_instances']))
         service_name = get_full_service_name(policy, srv['name'])
         config = pk_config.config()
-        k8s.scale_k8s_deploy(config['swarm_endpoint'],service_name,containercount)
+        k8s.scale_k8s_deploy(config['k8s_endpoint'],service_name,containercount)
 
-def perform_worker_node_scaling(policy):
-  node = policy['scaling']['nodes']
+def perform_worker_node_scaling(node):
   if 'm_node_count' in node.get('outputs',dict()):
-    log.debug('(S) Scaling values for worker node: min:{0} max:{1} calculated:{2}'
-             .format(node['min_instances'],node['max_instances'],node['outputs']['m_node_count']))
+    log.debug('(S) Scaling values for {3}: min:{0} max:{1} calculated:{2}'
+             .format(node['min_instances'],node['max_instances'],node['outputs']['m_node_count'],node['name']))
     nodecount = max(min(int(node['outputs']['m_node_count']),int(node['max_instances'])),int(node['min_instances']))
     config = pk_config.config()
     occo.scale_worker_node(
         endpoint=config['occopus_endpoint'],
         infra_name=config['occopus_infra_name'],
-        worker_name=config['occopus_worker_name'],
+        worker_name=node['name'],
         replicas=nodecount)
 
 def perform_policy_evaluation_on_a_k8s_deploy(policy,service_name):
@@ -81,8 +80,7 @@ def perform_policy_evaluation_on_a_k8s_deploy(policy,service_name):
      log.info('(P) => m_container_count: {0}'.format(int(srv.get('outputs',dict()).get('m_container_count',0))))
    return
 
-def perform_policy_evaluation_on_worker_nodes(policy):
-   node = policy['scaling']['nodes']
+def perform_policy_evaluation_on_worker_nodes(policy, node):
    inpvars = node['inputs']
    outvars = ['m_node_count','m_userdata']
    inpvars['m_userdata'] = policy['scaling'].get('userdata',None)
@@ -98,7 +96,7 @@ def perform_policy_evaluation_on_worker_nodes(policy):
        node['outputs']={}
      node['outputs']['m_node_count']=int(result.get('m_node_count',node['inputs']['m_node_count']))
      policy['scaling']['userdata']=result.get('m_userdata',None)
-   log.info('(P) => m_node_count: {0}'.format(int(node.get('outputs',dict()).get('m_node_count',0))))
+   log.info('(P) => m_node_count for {0}: {1}'.format(node['name'], int(node.get('outputs',dict()).get('m_node_count',0))))
    return
 
 def load_policy_from_file(policyfile):
@@ -107,11 +105,9 @@ def load_policy_from_file(policyfile):
     policy = f.read()
   return policy
 
-def set_worker_node_instance_number(policy,instances):
-  policy.setdefault('scaling',dict())
-  policy['scaling'].setdefault('nodes',dict())
-  policy['scaling']['nodes'].setdefault('outputs',dict())
-  policy['scaling']['nodes']['outputs']['m_node_count']=instances
+def set_worker_node_instance_number(node,instances):
+  node.setdefault('outputs',dict())
+  node['outputs']['m_node_count']=instances
   return
 
 def set_k8s_instance_number(policy,service_name,instances):
@@ -132,7 +128,6 @@ def prepare_session(policy_yaml):
   log.info('(C) Add exporters to prometheus configuration file starts')
   config_tpl = config['prometheus_config_template']
   config_target = config['prometheus_config_target']
-  shutil.copy(config_target, config_tpl)
   prom.add_exporters_to_prometheus_config(policy, config_tpl, config_target)
   log.info('(C) Add alerts to prometheus, generating rule files starts')
   prom.deploy_alerts_under_prometheus(config['prometheus_rules_directory'],
@@ -141,26 +136,27 @@ def prepare_session(policy_yaml):
   log.info('(C) Notify prometheus to reload config starts')
   prom.notify_to_reload_config(config['prometheus_endpoint'])
   log.info('(C) Querying number of target nodes from Occopus starts')
-  instances = occo.query_number_of_worker_nodes(
-                   endpoint=config['occopus_endpoint'],
-                   infra_name=config['occopus_infra_name'],
-                   worker_name=config['occopus_worker_name'])
-  log.info('(C) Setting m_node_count to {0}'.format(instances))
-  set_worker_node_instance_number(policy,instances)
+  for onenode in policy.get('scaling',dict()).get('nodes',[]):
+    instances = occo.query_number_of_worker_nodes(
+                    endpoint=config['occopus_endpoint'],
+                    infra_name=config['occopus_infra_name'],
+                    worker_name=onenode['name'])
+    log.info('(C) Setting m_node_count for {} to {}'.format(onenode['name'], instances))
+    set_worker_node_instance_number(onenode,instances)
   log.info('(C) Querying number of service replicas from Swarm starts')
-  for theservice in policy.get('scaling',dict()).get('services',dict()):
+  for theservice in policy.get('scaling',dict()).get('services',[]):
     service_name = theservice.get('name','')
     full_service_name = get_full_service_name(policy, service_name)
-    instances = k8s.query_k8s_replicas(config['swarm_endpoint'],full_service_name)
+    instances = k8s.query_k8s_replicas(config['k8s_endpoint'],full_service_name)
     log.info('(C) Setting m_container_count for {0} to {1}'.format(service_name, instances))
     set_k8s_instance_number(policy,service_name,instances)
   return policy
 
-def add_query_results_and_alerts_to_nodes(policy, results):
+def add_query_results_and_alerts_to_nodes(policy, results, node):
   queries, alerts = dict(), dict()
   policy['data']['query_results']={}
   policy['data']['alert_results']={}
-  scaling_rule_str = policy.get('scaling',dict()).get('nodes',dict()).get('scaling_rule','')
+  scaling_rule_str = node.get('scaling_rule','')
   for attrname, attrvalue in results.get('data',dict()).get('queries',dict()).iteritems():
     if scaling_rule_str is not None and scaling_rule_str.find(attrname) != -1:
       queries[attrname]=attrvalue
@@ -204,11 +200,10 @@ def add_query_results_and_alerts_to_service(policy, results, servicename):
         alerts[attrname]=False
   return queries, alerts
 
-def collect_inputs_for_nodes(policy):
+def collect_inputs_for_nodes(policy, node):
   inputs={}
-  node = policy.get('scaling',dict()).get('nodes',dict())
   config = pk_config.config()
-  inputs['m_nodes']=k8s.query_list_of_nodes(config['swarm_endpoint'])
+  inputs['m_nodes']=k8s.query_list_of_nodes(config['k8s_endpoint'], node['name'])
   mnc = node.get('outputs',dict()).get('m_node_count',None)
   inputs['m_node_count'] = max(min(int(mnc),int(node['max_instances'])),int(node['min_instances'])) if mnc else int(node['min_instances'])
 
@@ -235,18 +230,26 @@ def collect_inputs_for_nodes(policy):
   inputs['m_userdata']=policy.get('scaling',dict()).get('userdata',None)
   return inputs
 
-def set_policy_inputs_for_nodes(policy,inputs):
-  policy['scaling']['nodes']['inputs']=inputs
+def set_policy_inputs_for_nodes(policy,inputs,node):
+  node['inputs']=inputs
 
 def collect_inputs_for_containers(policy,service_name):
   inputs={}
   config = pk_config.config()
-  node = policy.get('scaling',dict()).get('nodes',dict())
-  inputs['m_nodes']=k8s.query_list_of_nodes(config['swarm_endpoint'])
-  mnc = node.get('outputs',dict()).get('m_node_count',None)
-  inputs['m_node_count'] = max(min(int(mnc),int(node['max_instances'])),int(node['min_instances'])) if mnc else int(node['min_instances'])
-  for theservice in policy.get('scaling',dict()).get('services',dict()):
+  nodes = policy.get('scaling',dict()).get('nodes',[])
+  inputs['m_nodes'] = []
+  mnc, mini, maxi = 0, 0, 0
+  
+  for theservice in policy.get('scaling',dict()).get('services',[]):
+
     if service_name == theservice.get('name',''):
+      for node in nodes:
+        if not theservice.get('hosts') or node['name'] in theservice.get('hosts', []):
+          inputs['m_nodes']+=k8s.query_list_of_nodes(config['k8s_endpoint'], node['name'])
+          mnc += int(node.get('outputs',dict()).get('m_node_count',None))
+          mini += int(node['min_instances'])
+          maxi += int(node['max_instances'])
+      inputs['m_node_count'] = max(min(int(mnc),int(maxi)),int(mini)) if mnc else int(mini)
       mcc = theservice.get('outputs',dict()).get('m_container_count',None)
       inputs['m_container_count'] = max(min(int(mcc),int(theservice['max_instances'])),int(theservice['min_instances']))\
             if mcc else int(theservice['min_instances'])
@@ -264,29 +267,31 @@ def perform_one_session(policy, results = None):
   config = pk_config.config()
   log.info('--- session starts ---')
   log.info('(M) Maintaining worker nodes starts')
-  k8s.down_nodes_maintenance(config['swarm_endpoint'],config['docker_node_unreachable_timeout'])
-  log.info('(I) Collecting inputs for nodes starts')
-  inputs = collect_inputs_for_nodes(policy)
-  set_policy_inputs_for_nodes(policy,inputs)
-  for x in inputs.keys():
-    log.info('(I) => "{0}": {1}'.format(x,inputs[x]))
-  log.info('(Q) Evaluating queries and alerts for nodes starts')
-  if results:
-    queries, alerts = add_query_results_and_alerts_to_nodes(policy, results)
-  else:
-    queries, alerts = prom.evaluate_data_queries_and_alerts_for_nodes(config['prometheus_endpoint'],policy)
-  for attrname, attrvalue in queries.iteritems():
-    log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
-  for attrname, attrvalue in alerts.iteritems():
-    log.info('(A) => "{0}" is "{1}".'.format(attrname,attrvalue))
-  log.info('(P) Policy evaluation for nodes starts')
-  perform_policy_evaluation_on_worker_nodes(policy)
-  log.info('(S) Scaling of nodes starts')
-  perform_worker_node_scaling(policy)
-  for attrname, attrvalue in alerts.iteritems():
-    prom.alerts_remove(attrname)
+  k8s.down_nodes_maintenance(config['k8s_endpoint'],config['docker_node_unreachable_timeout'])
+  for onenode in policy.get('scaling',dict()).get('nodes',[]):
+    node_name = onenode.get('name')
+    log.info('(I) Collecting inputs for node {} starts'.format(node_name))
+    inputs = collect_inputs_for_nodes(policy, onenode)
+    set_policy_inputs_for_nodes(policy,inputs,onenode)
+    for x in inputs.keys():
+      log.info('(I) => "{0}": {1}'.format(x,inputs[x]))
+    log.info('(Q) Evaluating queries and alerts for node {} starts'.format(node_name))
+    if results:
+      queries, alerts = add_query_results_and_alerts_to_nodes(policy, results, onenode)
+    else:
+      queries, alerts = prom.evaluate_data_queries_and_alerts_for_nodes(config['prometheus_endpoint'],policy, onenode)
+    for attrname, attrvalue in queries.iteritems():
+      log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
+    for attrname, attrvalue in alerts.iteritems():
+      log.info('(A) => "{0}" is "{1}".'.format(attrname,attrvalue))
+    log.info('(P) Policy evaluation for nodes starts')
+    perform_policy_evaluation_on_worker_nodes(policy, onenode)
+    log.info('(S) Scaling of nodes starts')
+    perform_worker_node_scaling(onenode)
+    for attrname, attrvalue in alerts.iteritems():
+      prom.alerts_remove(attrname)
 
-  for oneservice in policy.get('scaling',dict()).get('services',dict()):
+  for oneservice in policy.get('scaling',dict()).get('services',[]):
     service_name=oneservice.get('name')
     log.info('(I) Collecting inputs for service "{0}" starts'.format(service_name))
     inputs = collect_inputs_for_containers(policy,service_name)

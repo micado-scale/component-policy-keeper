@@ -45,14 +45,14 @@ def filter_data_queries_by_scaling_rule(queries,scaling_rule):
     if scaling_rule.find(param)!= -1:
       result[param]=query
 
-def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy):
+def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy,node):
   log=logging.getLogger('pk_prometheus')
   queries, alerts = dict(), dict()
   if 'data' not in policy:
     policy['data']={}
   if 'query_results' not in policy['data']:
     policy['data']['query_results']=dict()
-  scaling_rule_str = policy.get('scaling',dict()).get('nodes',dict()).get('scaling_rule','')
+  scaling_rule_str = node.get('scaling_rule','')
   for param,query in policy.get('data',dict()).get('queries',dict()).iteritems():
     try:
       if scaling_rule_str is not None and scaling_rule_str.find(param) != -1:
@@ -118,6 +118,7 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
   try:
     config_content = dict()
     if not pk_config.simulate():
+      shutil.copy(config_file, template_file)
       with open(template_file,'r') as f:
         config_content = yaml.round_trip_load(f)
     if 'scrape_configs' not in config_content:
@@ -156,12 +157,12 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
           if old_label:
             old_label = old_label[0]
             old_regex = old_label.get('regex')
-            new_regex = '{}|.*{}'.format(old_regex, exp[1])
+            new_regex = '{}|{}:{}'.format(old_regex, exp[0], exp[1])
             old_label['regex'] = new_regex
           else:
-            label = {'source_labels': ['__address__'],
+            label = {'source_labels': ['instance'],
                      'action': 'keep',
-                     'regex': '.*{}'.format(exp[1])}
+                     'regex': '{}:{}'.format(exp[0], exp[1])}
             relabel.append(label)
         else:
           static_config['targets'].append(exporter_endpoint)

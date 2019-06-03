@@ -4,16 +4,17 @@ import logging
 import pk_config
 import time
 
-def query_list_of_nodes(endpoint,status='ready'):
+def query_list_of_nodes(endpoint,worker_name='micado-worker',status='ready'):
   log=logging.getLogger('pk_k8s')
   list_of_nodes=[]
   if pk_config.simulate():
-    return None
+    return dict()
   kubernetes.config.load_kube_config()
   client = kubernetes.client.CoreV1Api()
   try:
     if status=='ready':
       nodes = [x for x in client.list_node().items if not x.spec.taints]
+      nodes = [x for x in nodes if x.metadata.labels.get('micado.eu/node_type') == worker_name]
     elif status=='down':
       nodes = [x for x in client.list_node().items if x.spec.taints and 'master' not in x.spec.taints[0].key]
     for n in nodes:
@@ -24,7 +25,7 @@ def query_list_of_nodes(endpoint,status='ready'):
     return list_of_nodes
   except Exception as e:
     log.exception('(Q) Query of k8s nodes failed.')
-    return None
+    return dict()
 
 def scale_k8s_deploy(endpoint,service_name,replicas):
   service_name = '-'.join(service_name.split('_')[1:])
