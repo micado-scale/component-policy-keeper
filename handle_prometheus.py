@@ -160,9 +160,9 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
             new_regex = '{}|{}:{}'.format(old_regex, exp[0], exp[1])
             old_label['regex'] = new_regex
           else:
-            label = {'source_labels': ['instance'],
+            label = {'source_labels': ['endpoint'],
                      'action': 'keep',
-                     'regex': '{}:{}'.format(exp[0], exp[1])}
+                     'regex': '(^a)|{}:{}'.format(exp[0], exp[1])}
             relabel.append(label)
         else:
           static_config['targets'].append(exporter_endpoint)
