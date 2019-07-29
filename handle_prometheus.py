@@ -22,8 +22,14 @@ def extract_value_from_prometheus_response(expression,response,filterdict=dict()
     result = [ x for x in response['data']['result']
              if x.get('metric',None) is not None and is_subdict(filterdict,x['metric']) ]
     if len(result)>1:
-      raise Exception('Multiple results in prometheus response for expression "{0}": "{1}"'
-                      .format(expression,str(result)))
+      log.debug('Multiple results in prometheus response for expression "{0}": "{1}"'
+                .format(expression,str(result)))
+      if not isinstance(expression,list):
+        raise Exception('Multiple results in prometheus response for expression "{0}": "{1}"'
+                        .format(expression,str(result)))
+      else:
+        return [ x.get('metric',dict()).get(expression[1]) \
+                 for x in result if x.get('metric',dict()).get(expression[1])]
     if len(result)<1:
       raise Exception('No results found in prometheus response for expression "{0}": "{1}"'
                       .format(expression,str(result)))
@@ -49,7 +55,7 @@ def filter_data_queries_by_scaling_rule(queries,scaling_rule):
 def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy,node):
   log=logging.getLogger('pk_prometheus')
   if pk_config.dryrun_get(dryrun_id):
-    log.info('(Q)   DRYRUN enabled. Skipping...')
+    log.info('(Q)   DRYRUN enabled. Assigning queries as values to metrics...')
   queries, alerts = dict(), dict()
   if 'data' not in policy:
     policy['data']={}
@@ -58,16 +64,26 @@ def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy,node):
   scaling_rule_str = node.get('scaling_rule','')
   for param,query in policy.get('data',dict()).get('queries',dict()).iteritems():
     try:
-      if scaling_rule_str is not None and scaling_rule_str.find(param) != -1:
+      if param.find('m_opt') != -1 or \
+         (scaling_rule_str is not None and \
+         scaling_rule_str.find(param) != -1):
         if pk_config.dryrun_get(dryrun_id):
+          #TODO: handle dummy value more appropriately
           policy['data']['query_results'][param]=query
           queries[param]=query
 	else:
-          response = requests.get(endpoint+"/api/v1/query?query="+query).json()
-          log.debug('Prometheus response query "{0}":{1}'.format(query,response))
-          val = extract_value_from_prometheus_response(query,response,dict())
-          policy['data']['query_results'][param]=float(val)
-          queries[param]=float(val)
+          if isinstance(query,list):
+            response = requests.get(endpoint+"/api/v1/query?query="+query[0]).json()
+            log.debug('Prometheus response query "{0}":{1}'.format(query[0],response))
+            val = extract_value_from_prometheus_response(query,response,dict())
+            policy['data']['query_results'][param]=val
+            queries[param]=val
+          else:
+            response = requests.get(endpoint+"/api/v1/query?query="+query).json()
+            log.debug('Prometheus response query "{0}":{1}'.format(query,response))
+            val = extract_value_from_prometheus_response(query,response,dict())
+            policy['data']['query_results'][param]=float(val)
+            queries[param]=float(val)
     except Exception as e:
       policy['data']['query_results'][param]=None
       queries[param]=None
