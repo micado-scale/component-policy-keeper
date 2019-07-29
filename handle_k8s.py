@@ -6,7 +6,7 @@ import time
 
 dryrun_id='k8s'
 
-def query_list_of_nodes(endpoint,status='ready'):
+def query_list_of_nodes(endpoint,worker_name='micado-worker',status='ready'):
   log=logging.getLogger('pk_k8s')
   list_of_nodes=[]
   if pk_config.dryrun_get(dryrun_id):
@@ -21,6 +21,7 @@ def query_list_of_nodes(endpoint,status='ready'):
   try:
     if status=='ready':
       nodes = [x for x in client.list_node().items if not x.spec.taints]
+      nodes = [x for x in nodes if x.metadata.labels.get('micado.eu/node_type') == worker_name]
     elif status=='down':
       nodes = [x for x in client.list_node().items if x.spec.taints and 'master' not in x.spec.taints[0].key]
     for n in nodes:
