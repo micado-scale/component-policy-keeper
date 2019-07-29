@@ -1,9 +1,11 @@
 
  
-prometheus_endpoint: 'http://192.168.154.97:9090'
-prometheus_config_template: '/root/original_prometheus_config.yaml'
-prometheus_config_target: '/root/prometheus_config.yaml'
+prometheus_endpoint: 'http://localhost'
+prometheus_config_template: '/tmp/original_prometheus_config.yaml'
+prometheus_config_target: '/tmp/prometheus_config.yaml'
 prometheus_rules_directory: '/var/lib/micado/prometheus/config'
+
+docker_node_unreachable_timeout: 120
 
 k8s_endpoint: 'http://192.168.154.97:2375'
 
@@ -58,7 +60,7 @@ logging:
             propagate: false
             handlers: [console, file]
         pk_prometheus:
-            propagate: false
+            propagate: true
             handlers: [console, file]
         pk_optimizer:
             propagate: false

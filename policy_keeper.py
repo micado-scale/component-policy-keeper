@@ -147,19 +147,7 @@ def prepare_session(policy_yaml):
                                       policy.get('stack','pk'))
   log.info('(C) Notify prometheus to reload config starts')
   prom.notify_to_reload_config(config['prometheus_endpoint'])
-<<<<<<< HEAD
   #Initialise nodes through Occopus
-  log.info('(C) Querying number of worker nodes from Occopus starts')
-  instances = occo.query_number_of_worker_nodes(
-                   endpoint=config['occopus_endpoint'],
-                   infra_name=config['occopus_infra_name'],
-                   worker_name=config['occopus_worker_name'])
-  log.info('(C)   Setting m_node_count to {0}'.format(instances))
-  set_worker_node_instance_number(policy,instances)
-  #Initialise service through K8S
-  log.info('(C) Querying number of containers starts')
-  for theservice in policy.get('scaling',dict()).get('services',dict()):
-=======
   log.info('(C) Querying number of target nodes from Occopus starts')
   for onenode in policy.get('scaling',dict()).get('nodes',[]):
     instances = occo.query_number_of_worker_nodes(
@@ -168,9 +156,9 @@ def prepare_session(policy_yaml):
                     worker_name=onenode['name'])
     log.info('(C) Setting m_node_count for {} to {}'.format(onenode['name'], instances))
     set_worker_node_instance_number(onenode,instances)
-  log.info('(C) Querying number of service replicas from Swarm starts')
+  #Initialise service through K8S
+  log.info('(C) Querying number of service replicas from K8s starts')
   for theservice in policy.get('scaling',dict()).get('services',[]):
->>>>>>> devel
     service_name = theservice.get('name','')
     full_service_name = get_full_service_name(policy, service_name)
     instances = k8s.query_k8s_replicas(config['k8s_endpoint'],full_service_name)
@@ -298,35 +286,6 @@ def perform_one_session(policy, results = None):
   config = pk_config.config()
   log.info('--- session starts ---')
   log.info('(M) Maintaining worker nodes starts')
-<<<<<<< HEAD
-  k8s.down_nodes_maintenance(config.get('k8s_endpoint'),config.get('docker_node_unreachable_timeout',None))
-  log.info('(I) Collecting inputs for nodes starts')
-  inputs = collect_inputs_for_nodes(policy)
-  set_policy_inputs_for_nodes(policy,inputs)
-  for x in inputs.keys():
-    log.info('(I)   => "{0}": {1}'.format(x,inputs[x]))
-  log.info('(Q) Evaluating queries and alerts for nodes starts')
-  if results:
-    queries, alerts = add_query_results_and_alerts_to_nodes(policy, results)
-  else:
-    queries, alerts = prom.evaluate_data_queries_and_alerts_for_nodes(config['prometheus_endpoint'],policy)
-  for attrname, attrvalue in queries.iteritems():
-    log.info('(Q)   => "{0}" is "{1}".'.format(attrname,attrvalue))
-  for attrname, attrvalue in alerts.iteritems():
-    log.info('(A)   => "{0}" is "{1}".'.format(attrname,attrvalue))
-
-  log.info('(O) Creating sample for the optimizer starts')
-  sample = optim.generate_sample(queries,inputs)
-  log.info('(O) Sending sample for the optimizer starts')
-  optim.calling_rest_api_sample(sample)
-
-  log.info('(P) Policy evaluation for nodes starts')
-  perform_policy_evaluation_on_worker_nodes(policy)
-  log.info('(S) Scaling of nodes starts')
-  perform_worker_node_scaling(policy)
-  for attrname, attrvalue in alerts.iteritems():
-    prom.alerts_remove(attrname)
-=======
   k8s.down_nodes_maintenance(config['k8s_endpoint'],config['docker_node_unreachable_timeout'])
   for onenode in policy.get('scaling',dict()).get('nodes',[]):
     node_name = onenode.get('name')
@@ -350,8 +309,6 @@ def perform_one_session(policy, results = None):
     perform_worker_node_scaling(onenode)
     for attrname, attrvalue in alerts.iteritems():
       prom.alerts_remove(attrname)
->>>>>>> devel
-
   for oneservice in policy.get('scaling',dict()).get('services',[]):
     service_name=oneservice.get('name')
     log.info('(I) Collecting inputs for service "{0}" starts'.format(service_name))
