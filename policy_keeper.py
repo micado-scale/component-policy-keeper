@@ -48,7 +48,21 @@ def perform_service_scaling(policy,service_name):
         k8s.scale_k8s_deploy(config['k8s_endpoint'],service_name,containercount)
 
 def perform_worker_node_scaling(node):
-  if 'm_node_count' in node.get('outputs',dict()):
+  m_node_count = node.get('outputs',dict()).get('m_node_count')
+  nodes_to_drop_list = node.get('outputs',dict()).get('m_nodes_todrop',list())
+  if nodes_to_drop_list:
+    config = pk_config.config()
+    for nodetodrop in nodes_to_drop_list:
+      if m_node_count>node['min_instances']:
+        log.debug('(S) Dropping node {0}...'.format(nodetodrop))
+        occo.drop_worker_node(
+          endpoint=config['occopus_endpoint'],
+          infra_name=config['occopus_infra_name'],
+          worker_name=node['name'],
+          replica=nodetodrop)
+        m_node_count-=1
+    node['outputs']['m_node_count']=m_node_count
+  elif 'm_node_count' in node.get('outputs',dict()):
     log.debug('(S) Scaling values for {3}: min:{0} max:{1} calculated:{2}'
              .format(node['min_instances'],node['max_instances'],node['outputs']['m_node_count'],node['name']))
     nodecount = max(min(int(node['outputs']['m_node_count']),int(node['max_instances'])),int(node['min_instances']))
@@ -83,7 +97,7 @@ def perform_policy_evaluation_on_a_k8s_deploy(policy,service_name):
 
 def perform_policy_evaluation_on_worker_nodes(policy, node):
    inpvars = node['inputs']
-   outvars = ['m_node_count','m_userdata']
+   outvars = ['m_node_count','m_userdata','m_nodes_todrop']
    inpvars['m_userdata'] = policy['scaling'].get('userdata',None)
    for attrname, attrvalue in policy.get('data',dict()).get('query_results',dict()).iteritems():
      inpvars[attrname]=attrvalue
@@ -96,9 +110,19 @@ def perform_policy_evaluation_on_worker_nodes(policy, node):
      result = evaluator.evaluate(node.get('scaling_rule',''), inpvars, outvars)
      if 'outputs' not in node:
        node['outputs']={}
-     node['outputs']['m_node_count']=int(result.get('m_node_count',node['inputs']['m_node_count']))
+
+     nodes_to_drop_list=result.get('m_nodes_todrop',[])
+     if nodes_to_drop_list:
+       node['outputs']['m_nodes_todrop']=nodes_to_drop_list
+       node['outputs']['m_node_count']=node['inputs']['m_node_count']
+     else:
+       node['outputs']['m_nodes_todrop']=[]
+       node['outputs']['m_node_count']=int(result.get('m_node_count',node['inputs']['m_node_count']))
      policy['scaling']['userdata']=result.get('m_userdata',None)
-   log.info('(P) => m_node_count for {0}: {1}'.format(node['name'], int(node.get('outputs',dict()).get('m_node_count',0))))
+   if node['outputs']['m_nodes_todrop']:
+     log.info('(P) => m_nodes_todrop for {0}: {1}'.format(node['name'], node['outputs']['m_nodes_todrop']))
+   else:
+     log.info('(P) => m_node_count for {0}: {1}'.format(node['name'], int(node.get('outputs',dict()).get('m_node_count',0))))
    return
 
 def load_policy_from_file(policyfile):
@@ -225,6 +249,7 @@ def collect_inputs_for_nodes(policy, node):
   inputs['m_nodes']=k8s.query_list_of_nodes(config['k8s_endpoint'], node['name'])
   mnc = node.get('outputs',dict()).get('m_node_count',None)
   inputs['m_node_count'] = max(min(int(mnc),int(node['max_instances'])),int(node['min_instances'])) if mnc else int(node['min_instances'])
+  inputs['m_nodes_todrop']=[]
 
   prev_node_count = node.get('inputs',dict()).get('m_node_count',None)
   prev_nodes = node.get('inputs',dict()).get('m_nodes',None)
@@ -293,16 +318,16 @@ def perform_one_session(policy, results = None):
     inputs = collect_inputs_for_nodes(policy, onenode)
     set_policy_inputs_for_nodes(policy,inputs,onenode)
     for x in inputs.keys():
-      log.info('(I) => "{0}": {1}'.format(x,inputs[x]))
+      log.info('(I)   => "{0}": {1}'.format(x,inputs[x]))
     log.info('(Q) Evaluating queries and alerts for node {} starts'.format(node_name))
     if results:
       queries, alerts = add_query_results_and_alerts_to_nodes(policy, results, onenode)
     else:
       queries, alerts = prom.evaluate_data_queries_and_alerts_for_nodes(config['prometheus_endpoint'],policy, onenode)
     for attrname, attrvalue in queries.iteritems():
-      log.info('(Q) => "{0}" is "{1}".'.format(attrname,attrvalue))
+      log.info('(Q)   => "{0}" is "{1}".'.format(attrname,attrvalue))
     for attrname, attrvalue in alerts.iteritems():
-      log.info('(A) => "{0}" is "{1}".'.format(attrname,attrvalue))
+      log.info('(A)   => "{0}" is "{1}".'.format(attrname,attrvalue))
     log.info('(P) Policy evaluation for nodes starts')
     perform_policy_evaluation_on_worker_nodes(policy, onenode)
     log.info('(S) Scaling of nodes starts')
