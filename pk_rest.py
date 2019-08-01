@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 log = None
 
-def init_service():
+def init_logging():
   global log 
   log = logging.getLogger('pk_rest')
 
