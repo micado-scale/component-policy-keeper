@@ -67,7 +67,9 @@ def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy,node):
       if param.find('m_opt') != -1 or \
          (scaling_rule_str is not None and \
          scaling_rule_str.find(param) != -1):
-        if pk_config.dryrun_get(dryrun_id):
+        if pk_config.dryrun_get(dryrun_id) or \
+           param.startswith("m_opt_target_minth_") or \
+           param.startswith("m_opt_target_maxth_"):
           #TODO: handle dummy value more appropriately
           policy['data']['query_results'][param]=query
           queries[param]=query
