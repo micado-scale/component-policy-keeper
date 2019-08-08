@@ -328,6 +328,12 @@ def perform_one_session(policy, results = None):
       log.info('(Q)   => "{0}" is "{1}".'.format(attrname,attrvalue))
     for attrname, attrvalue in alerts.iteritems():
       log.info('(A)   => "{0}" is "{1}".'.format(attrname,attrvalue))
+ 
+    log.info('(O) Creating sample for the optimizer starts')
+    sample = optim.generate_sample(queries,inputs)
+    log.info('(O) Sending sample for the optimizer starts')
+    optim.calling_rest_api_sample(sample)
+
     log.info('(P) Policy evaluation for nodes starts')
     perform_policy_evaluation_on_worker_nodes(policy, onenode)
     log.info('(S) Scaling of nodes starts')
