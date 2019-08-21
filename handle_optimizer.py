@@ -215,7 +215,7 @@ def generate_sample(userqueries=dict(),sysqueries=dict()):
       else:
         sample['sample']['input_metrics'].append(onesample)
   sample['sample']['timestamp']=str(time.time()).split('.')[0]
-  sample['vm_number']=sysqueries.get('m_node_count',None)
+  sample['sample']['vm_number']=sysqueries.get('m_node_count',None)
   return sample
 
 def calling_rest_api_sample(sample=dict()):
