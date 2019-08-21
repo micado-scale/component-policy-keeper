@@ -4,7 +4,7 @@ import multiprocessing
 from multiprocessing.queues import Queue
 import copy
 from asteval import Interpreter, make_symbol_table
-from threading import Thread
+import threading
 import logging
 
 log = None
@@ -14,7 +14,8 @@ def init_logging():
   log = logging.getLogger('pk_usercode')
 
 def text_catcher(queue):
-  while True:
+  t = threading.currentThread()
+  while getattr(t, "do_run", True):
     str=queue.get().rstrip()
     if str!='':
       log.info(str)
@@ -27,8 +28,9 @@ class StdoutQueue(Queue):
         self.put(msg)
 
     def flush(self):
-        sys.__stdout__.flush()
-
+        pass
+        #sys.__stdout__.flush()
+   
 class TimeoutException(Exception):
     """ It took too long to compile and execute. """
 
@@ -47,7 +49,7 @@ class RunnableProcessing(multiprocessing.Process):
     def run_func(self, func, q, *args, **kwargs):
         try:
             sys.stdout = q
-            #print("RUN_FUNC:"+str(func)+str(args))
+            q.write("\n")
             result = func(q, *args, **kwargs)
             self.queue.put((True, result))
         except Exception as e:
@@ -57,7 +59,10 @@ class RunnableProcessing(multiprocessing.Process):
         return self.queue.full()
 
     def result(self):
-        return self.queue.get()
+        x = self.queue.get()
+        self.queue.close()
+        del self.queue
+        return x
 
 
 def timeout(seconds, force_kill=True):
@@ -67,13 +72,13 @@ def timeout(seconds, force_kill=True):
     """
     def wrapper(function):
         def inner(*args, **kwargs):
-            log.info('==== [{0}] Executing the user defined algorithm starts... ===='
-                     .format(time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())))
 
             q = StdoutQueue()
-            monitor = Thread(target=text_catcher,args=(q,))
-            monitor.daemon = True
+            monitor = threading.Thread(target=text_catcher,args=(q,))
             monitor.start()
+
+            q.write('==== [{0}] Executing the user defined algorithm starts... ===='
+                     .format(time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())))
 
             now = time.time()
             proc = RunnableProcessing(function, q, *args, **kwargs)
@@ -85,9 +90,12 @@ def timeout(seconds, force_kill=True):
                 runtime = time.time() - now
                 raise TimeoutException('timed out after {0} seconds'.format(runtime))
             assert proc.done()
-            log.info('==== [{0}] Executing the user defined algorithm finished. ===='
+            monitor.do_run=False
+            q.write('==== [{0}] Executing the user defined algorithm finished. ===='
                      .format(time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())))
             success, result = proc.result()
+            monitor.join()
+            del q
             if success:
                 return result
             else:
