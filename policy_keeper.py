@@ -30,6 +30,12 @@ def resolve_queries(policy_yaml):
   template = jinja2.Template(policy_yaml)
   return template.render(values)
 
+def limit_instances(count,cmin,cmax):
+  cmin = 1 if not cmin else int(cmin)
+  cmax = cmin if not cmax else max(int(cmax),cmin)
+  count = max(min(int(count),cmax),cmin) if count else cmin
+  return count,cmin,cmax
+
 def get_full_service_name(policy, service_name):
   if policy.get('stack','') not in [None, '']:
     full_service_name='{0}_{1}'.format(policy['stack'],service_name)
@@ -63,9 +69,12 @@ def perform_worker_node_scaling(node):
         m_node_count-=1
     node['outputs']['m_node_count']=m_node_count
   elif 'm_node_count' in node.get('outputs',dict()):
-    log.debug('(S) Scaling values for {3}: min:{0} max:{1} calculated:{2}'
-             .format(node['min_instances'],node['max_instances'],node['outputs']['m_node_count'],node['name']))
-    nodecount = max(min(int(node['outputs']['m_node_count']),int(node['max_instances'])),int(node['min_instances']))
+    nodecount,nmin,nmax = limit_instances(
+        node['outputs'].get('m_node_count'),
+        node.get('min_instances'),
+        node.get('max_instances'))
+    log.debug('(S) Scaling values for {0}: min:{1} max:{2} calculated:{3} corrected:{4}'
+             .format(node['name'],nmin,nmax,node['outputs'].get('m_node_count',None),nodecount))
     config = pk_config.config()
     occo.scale_worker_node(
         endpoint=config['occopus_endpoint'],
@@ -119,7 +128,7 @@ def perform_policy_evaluation_on_worker_nodes(policy, node):
        node['outputs']['m_nodes_todrop']=[]
        node['outputs']['m_node_count']=int(result.get('m_node_count',node['inputs']['m_node_count']))
      policy['scaling']['userdata']=result.get('m_userdata',None)
-   if node['outputs']['m_nodes_todrop']:
+   if node['outputs'].get('m_nodes_todrop'):
      log.info('(P) => m_nodes_todrop for {0}: {1}'.format(node['name'], node['outputs']['m_nodes_todrop']))
    else:
      log.info('(P) => m_node_count for {0}: {1}'.format(node['name'], int(node.get('outputs',dict()).get('m_node_count',0))))
@@ -247,8 +256,10 @@ def collect_inputs_for_nodes(policy, node):
   inputs={}
   config = pk_config.config()
   inputs['m_nodes']=k8s.query_list_of_nodes(config['k8s_endpoint'], node['name'])
-  mnc = node.get('outputs',dict()).get('m_node_count',None)
-  inputs['m_node_count'] = max(min(int(mnc),int(node['max_instances'])),int(node['min_instances'])) if mnc else int(node['min_instances'])
+  inputs['m_node_count'],_,_ = limit_instances(
+    node.get('outputs',dict()).get('m_node_count'),
+    node.get('min_instances'),
+    node.get('max_instances'))
   inputs['m_nodes_todrop']=[]
 
   prev_node_count = node.get('inputs',dict()).get('m_node_count',None)
@@ -290,10 +301,10 @@ def collect_inputs_for_containers(policy,service_name):
       for node in nodes:
         if not theservice.get('hosts') or node['name'] in theservice.get('hosts', []):
           inputs['m_nodes']+=k8s.query_list_of_nodes(config['k8s_endpoint'], node['name'])
-          mnc += int(node.get('outputs',dict()).get('m_node_count',None))
-          mini += int(node['min_instances'])
-          maxi += int(node['max_instances'])
-      inputs['m_node_count'] = max(min(int(mnc),int(maxi)),int(mini)) if mnc else int(mini)
+          mnc,mini,maxi = limit_instances(node.get('outputs',dict()).get('m_node_count'),
+                                          node.get('min_instances'),
+                                          node.get('max_instances'))
+      inputs['m_node_count'] = mnc
       mcc = theservice.get('outputs',dict()).get('m_container_count',None)
       inputs['m_container_count'] = max(min(int(mcc),int(theservice['max_instances'])),int(theservice['min_instances']))\
             if mcc else int(theservice['min_instances'])
@@ -328,11 +339,12 @@ def perform_one_session(policy, results = None):
       log.info('(Q)   => "{0}" is "{1}".'.format(attrname,attrvalue))
     for attrname, attrvalue in alerts.iteritems():
       log.info('(A)   => "{0}" is "{1}".'.format(attrname,attrvalue))
- 
-    log.info('(O) Creating sample for the optimizer starts')
-    sample = optim.generate_sample(queries,inputs)
-    log.info('(O) Sending sample for the optimizer starts')
-    optim.calling_rest_api_sample(sample)
+
+    if 'm_opt_advice' in onenode.get('scaling_rule',''):
+      log.info('(O) Creating sample for the optimizer starts')
+      sample = optim.generate_sample(queries,inputs)
+      log.info('(O) Sending sample for the optimizer starts')
+      optim.calling_rest_api_sample(sample)
 
     log.info('(P) Policy evaluation for nodes starts')
     perform_policy_evaluation_on_worker_nodes(policy, onenode)
