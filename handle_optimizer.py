@@ -189,20 +189,20 @@ def calling_rest_api_init():
 
 def generate_sample(userqueries=dict(),sysqueries=dict()):
   log=logging.getLogger('pk_optimizer')
-  if pk_config.dryrun_get(dryrun_id):
-    log.info('(O)   DRYRUN enabled. Skipping...')
-    return dict()
-  if not m_opt_accessible:
-    return dict()
-  log.debug('(O) ALLQUERIES: {0}'.format(str(userqueries)))
-  log.debug('(O) SYSQUERIES: {0}'.format(str(sysqueries)))
+#  if pk_config.dryrun_get(dryrun_id):
+#    log.info('(O)   DRYRUN enabled. Skipping...')
+#    return dict()
+#  if not m_opt_accessible:
+#    return dict()
+  log.debug('(O)  USRQUERIES: {0}'.format(str(userqueries)))
+  log.debug('(O)  SYSQUERIES: {0}'.format(str(sysqueries)))
   sample = dict()
   sample['sample']=dict()
   sample['sample']['input_metrics']=[]
   sample['sample']['target_metrics']=[]
 
   for var in m_opt_variables:
-    log.debug('(O)   => Scanning1 {0} ...'.format(var['lname']))
+    log.debug('(O)  => Scanning {0} ...'.format(var['lname']))
     onesample=dict()
     onesample['name']=var['sname']
     onesample['value']=None
@@ -215,7 +215,8 @@ def generate_sample(userqueries=dict(),sysqueries=dict()):
       else:
         sample['sample']['input_metrics'].append(onesample)
   sample['sample']['timestamp']=str(time.time()).split('.')[0]
-  sample['sample']['vm_number']=sysqueries.get('m_node_count',None)
+  sample['sample']['vm_number']=max(len(sysqueries.get('m_nodes',[])),1)
+  log.debug('(O)  => Generated sample: '+str(sample))
   return sample
 
 def calling_rest_api_sample(sample=dict()):
