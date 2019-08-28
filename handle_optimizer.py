@@ -3,6 +3,7 @@ import requests
 from ruamel import yaml
 import shutil,os
 import pk_config
+from pk_helper import *
 import json,time
 
 DEFAULT_prestr_init = 'm_opt_init_'
@@ -163,6 +164,13 @@ def collect_init_params_and_variables(policy):
   for varname,query in policy.get('data',dict()).get('queries',dict()).iteritems():
     if check_if_target(varname):
       insert_target_structure(m_opt_init_params,varname,query)
+  for onenode in policy.get('scaling',dict()).get('nodes',[]):
+    if 'm_opt_advice' in onenode.get('scaling_rule',''):
+      _,omin,omax = limit_instances(None,
+                                    onenode.get('min_instances'),
+                                    onenode.get('max_instances'))
+      m_opt_init_params['constants']['min_vm_number']=omin
+      m_opt_init_params['constants']['max_vm_number']=omax
   log.debug('(O) m_opt_init_params (yaml) => {0}'.format(yaml.dump(m_opt_init_params)))
   log.debug('(O) m_opt_variables (yaml) => {0}'.format(yaml.dump(m_opt_variables)))
   return

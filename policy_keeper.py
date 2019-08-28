@@ -15,6 +15,7 @@ import evaluator
 import argparse
 import pk_rest
 import pk_config
+from pk_helper import *
 
 log = None
 
@@ -29,12 +30,6 @@ def resolve_queries(policy_yaml):
   log.info('values: {0}'.format(values))
   template = jinja2.Template(policy_yaml)
   return template.render(values)
-
-def limit_instances(count,cmin,cmax):
-  cmin = 1 if not cmin else int(cmin)
-  cmax = cmin if not cmax else max(int(cmax),cmin)
-  count = max(min(int(count),cmax),cmin) if count else cmin
-  return count,cmin,cmax
 
 def get_full_service_name(policy, service_name):
   if policy.get('stack','') not in [None, '']:
