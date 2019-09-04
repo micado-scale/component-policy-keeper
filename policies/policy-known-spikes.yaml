@@ -1,0 +1,28 @@
+stack: myexample
+data:
+  constants:
+    m_dryrun: ['prometheus','occopus','k8s','optimizer']
+    spikes: [ {'bt':'04-09-2019 08:00:00','et':'04-09-2019 12:00:00','min':30,'max':35},
+              {'bt':'04-09-2019 15:00:00','et':'04-09-2019 16:00:00','min':40,'max':45} ]
+scaling:
+  nodes: 
+    - name: "mynode"
+      min_instances: 1
+      max_instances: 50
+      scaling_rule: |
+        print('Start of scaling algorithm...')
+        m_node_count = 40
+        print "calculated m_node_count: "+str(m_node_count)
+        now = int(time.time())
+        print "current time epoch: "+str(now)
+        for p in spikes:
+          print "one spike: "+str(p)
+          beginepoch = int(time.mktime(time.strptime(p['bt'],'%d-%m-%Y %H:%M:%S')))
+          print "  btepoch: "+str(beginepoch)
+          endepoch = int(time.mktime(time.strptime(p['et'],'%d-%m-%Y %H:%M:%S')))
+          print "  etepoch: "+str(endepoch)
+          inspike = now > beginepoch and now < endepoch
+          print "  inspike: "+str(inspike)
+          m_node_count = min(max(m_node_count,p['min']),p['max']) if inspike else m_node_count
+        print "finalised m_node_count: "+str(m_node_count)
+        print('End of scaling algorithm.')
