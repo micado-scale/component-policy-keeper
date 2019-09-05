@@ -78,7 +78,7 @@ def remove_node(endpoint,id):
   kubernetes.config.load_kube_config()
   client = kubernetes.client.CoreV1Api()
   try:
-    client.delete_node(id, {})
+    client.delete_node(id)
   except Exception:
     log.error('(M)   => Removing k8s node failed.')
   return
