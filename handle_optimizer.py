@@ -28,13 +28,13 @@ as they must be specified in the policy description:
 
 data:
   constants:
-    m_opt_init_VAR1: 'value' 
+    m_opt_init_VAR1: 'value'
     ...
   queries:
     m_opt_input_VAR2: 'query expr for VAR2' ==> params specified this way are sent as sample for the optimiser
     m_opt_input_VAR3: 'query expr for VAR3'
     ...
-    m_opt_target_query_TARGET1: 'query expre for TARGET1' ==> params specified this way are sent 
+    m_opt_target_query_TARGET1: 'query expre for TARGET1' ==> params specified this way are sent
     m_opt_target_minth_TARGET1: 5
     m_opt_target_maxth_TARGET1: 10
     ...
@@ -48,7 +48,7 @@ m_opt_target_...: these params are are used both in init and sample communicatio
 
 =====================================
 
-The following dict (converted later to YAML) is required 
+The following dict (converted later to YAML) is required
 when calling the Optimizer REST API initialization method.
 This data structure is built based on the above policy description.
 
@@ -58,7 +58,7 @@ m_opt_init_params = {
 ...
 input_metrics: [
   { name: 'varname3' }
-  { name: 'varname4' } 
+  { name: 'varname4' }
   ... ]
 target_metrics: [
   { name: 'varname3', min_threshold: 'value5', max_threshold: 'value6' }
@@ -67,11 +67,11 @@ target_metrics: [
 
 =====================================
 
-The following list is required to identify the evaluated variables 
+The following list is required to identify the evaluated variables
 that are needed when calling the Optimizer REST API sample method.
 This data structure is built based on the above policy description.
 
-m_opt_variables = 
+m_opt_variables =
 [ { lname: 'name of variable in its original form: "m_opt_{input/target_query}_VARNAME"
     sname: 'name of variable used towards the Optimizer'
     query: 'query string associated to the variable'
@@ -138,7 +138,7 @@ def insert_target_structure(m_opt_init_params,key,value):
     targetdict[fieldname] = value
     targetdict['name'] = varname
     m_opt_init_params['constants']['target_metrics'].append(targetdict)
-  return    
+  return
 
 def collect_init_params_and_variables(policy):
   log=logging.getLogger('pk_optimizer')
@@ -182,7 +182,7 @@ def calling_rest_api_init():
   if pk_config.dryrun_get(dryrun_id):
     log.info('(O)   DRYRUN enabled. Skipping...')
     return
-  url = config.get('optimizer_endpoint')+'/optimizer/init'
+  url = config.get('optimizer_endpoint')+'/init'
   log.debug('(O) Calling optimizer REST API init() method: '+url)
   try:
     response = requests.post(url, data=yaml.dump(m_opt_init_params))
@@ -232,10 +232,10 @@ def calling_rest_api_sample(sample=dict()):
   config = pk_config.config()
   if pk_config.dryrun_get(dryrun_id):
     log.info('(O)   DRYRUN enabled. Skipping...')
-    return 
+    return
   if not m_opt_accessible:
     return
-  url = config.get('optimizer_endpoint')+'/optimizer/sample'
+  url = config.get('optimizer_endpoint')+'/sample'
   log.debug('(O) Calling optimizer REST API sample() method: '+url)
   response = requests.post(url, data=yaml.dump(sample))
   log.debug('(O) Response: '+str(response))
@@ -246,7 +246,7 @@ def calling_rest_api_advice():
   if pk_config.dryrun_get(dryrun_id) or not m_opt_accessible:
     return m_opt_dummy_advice
   config = pk_config.config()
-  url = config.get('optimizer_endpoint')+'/optimizer/advice'
+  url = config.get('optimizer_endpoint')+'/advice'
   log.debug('(O) Calling optimizer REST API advice() method: '+url)
   response = requests.get(url).json()
   log.debug('(O) Response: {0}'.format(response))
