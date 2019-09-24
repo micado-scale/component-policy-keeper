@@ -78,8 +78,8 @@ class RunnableProcessing(multiprocessing.Process):
 
     def result(self):
         x = self.queue.get()
-        #self.queue.close()
-        #del self.queue
+        self.queue.close()
+        del self.queue
         return x
         
 
