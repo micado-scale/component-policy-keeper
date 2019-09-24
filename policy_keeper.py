@@ -377,6 +377,7 @@ def perform_one_session(policy, results = None):
 def start(policy_yaml):
   global log
   log = logging.getLogger('pk')
+  evaluator.init_queue_reading()
   policy = prepare_session(policy_yaml)
   while not pk_config.finish_scaling():
     try:
@@ -402,6 +403,7 @@ def stop(policy_yaml):
                                       policy.get('stack','pk'))
   log.info('(C) Notify prometheus to reload config starts')
   prom.notify_to_reload_config(config['prometheus_endpoint'])
+  evaluator.stop_queue_reading()
 
 def perform_policy_keeping(policy_yaml):
   try:
