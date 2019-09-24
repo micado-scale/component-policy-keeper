@@ -5,6 +5,8 @@ import pk_config
 import time
 
 dryrun_id='k8s'
+MASTER = 'node-role.kubernetes.io/master'
+NOTREADY = 'node.kubernetes.io/unreachable'
 
 def query_list_of_nodes(endpoint,worker_name='micado-worker',status='ready'):
   log=logging.getLogger('pk_k8s')
@@ -19,11 +21,12 @@ def query_list_of_nodes(endpoint,worker_name='micado-worker',status='ready'):
   kubernetes.config.load_kube_config()
   client = kubernetes.client.CoreV1Api()
   try:
+    nodes = [x for x in client.list_node().items if MASTER not in x.metadata.labels]
     if status=='ready':
-      nodes = [x for x in client.list_node().items if not x.spec.taints]
+      nodes = [x for x in nodes if NOTREADY not in [y.key for y in x.spec.taints or []]]
       nodes = [x for x in nodes if x.metadata.labels.get('micado.eu/node_type') == worker_name]
     elif status=='down':
-      nodes = [x for x in client.list_node().items if x.spec.taints and 'master' not in x.spec.taints[0].key]
+      nodes = [x for x in nodes if NOTREADY in [y.key for y in x.spec.taints or []]]
     for n in nodes:
       a = {}
       a['ID']=n.metadata.name
@@ -78,7 +81,7 @@ def remove_node(endpoint,id):
   kubernetes.config.load_kube_config()
   client = kubernetes.client.CoreV1Api()
   try:
-    client.delete_node(id, {})
+    client.delete_node(id)
   except Exception:
     log.error('(M)   => Removing k8s node failed.')
   return
