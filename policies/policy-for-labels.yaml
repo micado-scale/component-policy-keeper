@@ -1,0 +1,36 @@
+stack: myexample
+data:
+  constants:
+    m_dryrun: ['k8s','optimizer']
+    MWID_label: 'micado_worker_id-'
+  queries:
+    IDLEWORKERS: ['idle_workers','saker_tag']
+scaling:
+  nodes:
+    - name: "helloworld" 
+      min_instances: 2
+      max_instances: 20
+      scaling_rule: |
+        print('Start of scaling algorithm...')
+        print('IDLEWORKERS: '+str(IDLEWORKERS))
+#        REALIDLEWORKERS=[]
+#        for x in IDLEWORKERS:
+#          if x.startswith(MWID_label):
+#            REALIDLEWORKERS.append(x[len(MWID_label):])
+#        print('REALIDLEWORKERS: '+str(REALIDLEWORKERS))
+        if m_node_count<2:
+          print('TIME TO ADD NODES!')
+          m_node_count+=1
+        else:
+          print('TIME TO DROP NODES!')
+          m_nodes_todrop=['a00dea20-bfea-456a-a95c-7993c7f25423']
+          print('NODES TO DROP: '+str(m_nodes_todrop))
+        print('End of scaling algorithm.')
+  services:
+    - name: "worker"
+      min_instances: 1
+      max_instances: 10
+  
+      
+          
+        

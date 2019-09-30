@@ -4,19 +4,29 @@ import logging
 import pk_config
 import time
 
+dryrun_id='k8s'
+MASTER = 'node-role.kubernetes.io/master'
+NOTREADY = 'node.kubernetes.io/unreachable'
+
 def query_list_of_nodes(endpoint,worker_name='micado-worker',status='ready'):
   log=logging.getLogger('pk_k8s')
   list_of_nodes=[]
-  if pk_config.simulate():
-    return dict()
+  if pk_config.dryrun_get(dryrun_id):
+    log.info('(I)   DRYRUN enabled. Skipping...')
+    a = {}
+    a['ID']='dummyID'
+    a['Addr']='127.0.0.1'
+    list_of_nodes.append(a.copy())
+    return list_of_nodes
   kubernetes.config.load_kube_config()
   client = kubernetes.client.CoreV1Api()
   try:
+    nodes = [x for x in client.list_node().items if MASTER not in x.metadata.labels]
     if status=='ready':
-      nodes = [x for x in client.list_node().items if not x.spec.taints]
+      nodes = [x for x in nodes if NOTREADY not in [y.key for y in x.spec.taints or []]]
       nodes = [x for x in nodes if x.metadata.labels.get('micado.eu/node_type') == worker_name]
     elif status=='down':
-      nodes = [x for x in client.list_node().items if x.spec.taints and 'master' not in x.spec.taints[0].key]
+      nodes = [x for x in nodes if NOTREADY in [y.key for y in x.spec.taints or []]]
     for n in nodes:
       a = {}
       a['ID']=n.metadata.name
@@ -30,8 +40,9 @@ def query_list_of_nodes(endpoint,worker_name='micado-worker',status='ready'):
 def scale_k8s_deploy(endpoint,service_name,replicas):
   service_name = '-'.join(service_name.split('_')[1:])
   log=logging.getLogger('pk_k8s')
-  log.info('(S) => m_container_count: {0}'.format(replicas))
-  if pk_config.simulate():
+  log.info('(S)   => m_container_count: {0}'.format(replicas))
+  if pk_config.dryrun_get(dryrun_id):
+    log.info('(S)   DRYRUN enabled. Skipping...')
     return
   kubernetes.config.load_kube_config()
   client = kubernetes.client.ExtensionsV1beta1Api()
@@ -47,30 +58,32 @@ def query_k8s_replicas(endpoint,service_name):
   service_name = '-'.join(service_name.split('_')[1:])
   log=logging.getLogger('pk_k8s')
   instance = 1
-  if pk_config.simulate():
-    return
+  if pk_config.dryrun_get(dryrun_id):
+    log.info('(I)   DRYRUN enabled. Skipping...')
+    return instance
   kubernetes.config.load_kube_config()
   client = kubernetes.client.ExtensionsV1beta1Api()
   try:
     dep = client.read_namespaced_deployment(service_name, "default")
     replicas = dep.spec.replicas
-    log.debug('(C) => m_container_count for {0}: {1}'.format(service_name,replicas))
+    log.debug('(I)   => m_container_count for {0}: {1}'.format(service_name,replicas))
   except Exception as e:
-    log.warning('(C) Querying k8s service "{0}" replicas failed: {1}'.format(service_name,str(e)))
+    log.warning('(Q) Querying k8s service "{0}" replicas failed: {1}'.format(service_name,str(e)))
   return instance
 
 down_nodes_stored={}
 
 def remove_node(endpoint,id):
   log=logging.getLogger('pk_k8s')
-  if pk_config.simulate():
+  if pk_config.dryrun_get(dryrun_id):
+    log.info('(M)   DRYRUN enabled. Skipping...')
     return
   kubernetes.config.load_kube_config()
   client = kubernetes.client.CoreV1Api()
   try:
-    client.delete_node(id, {})
+    client.delete_node(id)
   except Exception:
-    log.error('(M) => Removing k8s node failed.')
+    log.error('(M)   => Removing k8s node failed.')
   return
 
 def down_nodes_cleanup_by_list(stored, actual):
@@ -91,12 +104,15 @@ def down_nodes_cleanup_by_timeout(endpoint, stored, timeout):
   current_time = int(time.time())
   for id, node in stored.items():
     if node['micado_timestamp']+timeout < current_time:
-      log.info('(M) => Node {0} is down for more than {1} seconds, removing.'.format(id,timeout))
+      log.info('(M)   => Node {0} is down for more than {1} seconds, removing.'.format(id,timeout))
       remove_node(endpoint,id)
       del stored[id]
 
 def down_nodes_maintenance(endpoint, down_nodes_timeout = 120):
   log=logging.getLogger('pk_k8s')
+  if pk_config.dryrun_get(dryrun_id):
+    log.info('(M)   DRYRUN enabled. Skipping...')
+    return
   down_nodes_actual = query_list_of_nodes(endpoint,status='down')
   down_nodes_cleanup_by_list(down_nodes_stored, down_nodes_actual)
   down_nodes_add_from_list(down_nodes_stored, down_nodes_actual)

@@ -1,0 +1,37 @@
+stack: myexample
+data:
+  constants:
+    m_dryrun: ['prometheus','occopus','k8s']
+    m_opt_init_VAR1: 1234
+    m_opt_init_VAR2: 5678
+    m_opt_init_training_samples_required: 3
+    m_opt_init_min_vm_number: 1
+    m_opt_init_max_vm_number: 5
+  queries:
+    m_opt_input_MYVAR1: 12
+    m_opt_input_MYVAR2: 13
+    m_opt_target_query_MYTARGET1: 8 
+    m_opt_target_minth_MYTARGET1: 5
+    m_opt_target_maxth_MYTARGET1: 10
+scaling:
+  nodes: 
+    - name: "mynode"
+      min_instances: 1
+      max_instances: 5
+      scaling_rule: |
+        print('Start of scaling algorithm...')
+        adv = m_opt_advice()
+        print('  ADVICE.valid: '+str(adv['valid']))
+        print('  ADVICE.phase: '+str(adv['phase']))
+        print('  ADVICE.vmnum: '+str(adv['vmnumber']))
+        print('  ADVICE.confident: '+str(adv['confident']))
+        print('  ADVICE.errmsg: '+str(adv['errmsg']))
+        print('End of scaling algorithm.')
+  services:
+    - name: "worker"
+      min_instances: 1
+      max_instances: 10
+  
+      
+          
+        
