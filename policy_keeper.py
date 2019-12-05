@@ -90,6 +90,7 @@ def perform_policy_evaluation_on_a_k8s_deploy(policy,service_name):
        inpvars[attrname]=attrvalue
      for attrname, attrvalue in policy.get('data',dict()).get('constants',dict()).iteritems():
        inpvars[attrname]=attrvalue
+     inpvars['requests']=requests
      if srv.get('scaling_rule','')!='':
        result = evaluator.evaluate(srv.get('scaling_rule',''), inpvars, outvars)
        if 'outputs' not in srv:
@@ -110,6 +111,7 @@ def perform_policy_evaluation_on_worker_nodes(policy, node):
    for attrname, attrvalue in policy.get('data',dict()).get('constants',dict()).iteritems():
      inpvars[attrname]=attrvalue
    inpvars['m_opt_advice']=optim.calling_rest_api_advice
+   inpvars['requests']=requests
    if node.get('scaling_rule','')!='':
      result = evaluator.evaluate(node.get('scaling_rule',''), inpvars, outvars)
      if 'outputs' not in node:
