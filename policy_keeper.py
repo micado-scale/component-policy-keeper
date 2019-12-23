@@ -6,6 +6,7 @@ import json
 import shutil
 import handle_k8s as k8s
 import handle_occopus as occo
+import handle_terraform as terra
 import handle_prometheus as prom
 import handle_optimizer as optim
 import jinja2
@@ -51,6 +52,7 @@ def perform_service_scaling(policy,service_name):
 def perform_worker_node_scaling(node):
   m_node_count = node.get('outputs',dict()).get('m_node_count')
   nodes_to_drop_list = node.get('outputs',dict()).get('m_nodes_todrop',list())
+  cloud = get_cloud_orchestrator(node)
   if nodes_to_drop_list:
     config = pk_config.config()
     for nodetodrop in nodes_to_drop_list:
@@ -137,6 +139,12 @@ def load_policy_from_file(policyfile):
     policy = f.read()
   return policy
 
+def get_cloud_orchestrator(node):
+  if node.get('orchestrator', '').lower() == 'terraform':
+    return terra
+  else:
+    return occo
+
 def set_worker_node_instance_number(node,instances):
   node.setdefault('outputs',dict())
   node['outputs']['m_node_count']=instances
@@ -180,7 +188,8 @@ def prepare_session(policy_yaml):
   #Initialise nodes through Occopus
   log.info('(C) Querying number of target nodes from Occopus starts')
   for onenode in policy.get('scaling',dict()).get('nodes',[]):
-    instances = occo.query_number_of_worker_nodes(
+    cloud = get_cloud_orchestrator(onenode)
+    instances = cloud.query_number_of_worker_nodes(
                     endpoint=config['occopus_endpoint'],
                     infra_name=config['occopus_infra_name'],
                     worker_name=onenode['name'])
