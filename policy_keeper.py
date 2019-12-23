@@ -49,22 +49,20 @@ def perform_service_scaling(policy,service_name):
         config = pk_config.config()
         k8s.scale_k8s_deploy(config['k8s_endpoint'],service_name,containercount)
 
-def perform_worker_node_scaling(node):
+def get_node_scaling(node):
   m_node_count = node.get('outputs',dict()).get('m_node_count')
   nodes_to_drop_list = node.get('outputs',dict()).get('m_nodes_todrop',list())
   cloud = get_cloud_orchestrator(node)
+  config = pk_config.config()
+  scaling_info = {'config': config, 'node_name': node['name']}
   if nodes_to_drop_list:
-    config = pk_config.config()
     for nodetodrop in nodes_to_drop_list:
       if m_node_count>node['min_instances']:
         log.debug('(S) Dropping node {0}...'.format(nodetodrop))
-        occo.drop_worker_node(
-          endpoint=config['occopus_endpoint'],
-          infra_name=config['occopus_infra_name'],
-          worker_name=node['name'],
-          replica=nodetodrop)
+        scaling_info.setdefault('replicas', []).append(nodetodrop)
         m_node_count-=1
     node['outputs']['m_node_count']=m_node_count
+    return cloud.drop_worker_node, scaling_info
   elif 'm_node_count' in node.get('outputs',dict()):
     nodecount,nmin,nmax = limit_instances(
         node['outputs'].get('m_node_count'),
@@ -72,12 +70,9 @@ def perform_worker_node_scaling(node):
         node.get('max_instances'))
     log.debug('(S) Scaling values for {0}: min:{1} max:{2} calculated:{3} corrected:{4}'
              .format(node['name'],nmin,nmax,node['outputs'].get('m_node_count',None),nodecount))
-    config = pk_config.config()
-    occo.scale_worker_node(
-        endpoint=config['occopus_endpoint'],
-        infra_name=config['occopus_infra_name'],
-        worker_name=node['name'],
-        replicas=nodecount)
+    scaling_info['replicas'] = nodecount
+    return cloud.scale_worker_node, scaling_info
+  return None, None
 
 def perform_policy_evaluation_on_a_k8s_deploy(policy,service_name):
    outvars = ['m_container_count','m_userdata']
@@ -187,11 +182,11 @@ def prepare_session(policy_yaml):
   prom.notify_to_reload_config(config['prometheus_endpoint'])
   #Initialise nodes through Occopus
   log.info('(C) Querying number of target nodes from Occopus starts')
+  #policy.setdefault('scaling', dict())["cloud_orchestrator"] = get
   for onenode in policy.get('scaling',dict()).get('nodes',[]):
     cloud = get_cloud_orchestrator(onenode)
     instances = cloud.query_number_of_worker_nodes(
-                    endpoint=config['occopus_endpoint'],
-                    infra_name=config['occopus_infra_name'],
+                    config,
                     worker_name=onenode['name'])
     log.info('(C) Setting m_node_count for {} to {}'.format(onenode['name'], instances))
     set_worker_node_instance_number(onenode,instances)
@@ -329,6 +324,7 @@ def perform_one_session(policy, results = None):
   log.info('--- session starts ---')
   log.info('(M) Maintaining worker nodes starts')
   k8s.down_nodes_maintenance(config['k8s_endpoint'],config['docker_node_unreachable_timeout'])
+  nodes_to_scale = dict()
   for onenode in policy.get('scaling',dict()).get('nodes',[]):
     node_name = onenode.get('name')
     log.info('(I) Collecting inputs for node {} starts'.format(node_name))
@@ -355,9 +351,15 @@ def perform_one_session(policy, results = None):
     log.info('(P) Policy evaluation for nodes starts')
     perform_policy_evaluation_on_worker_nodes(policy, onenode)
     log.info('(S) Scaling of nodes starts')
-    perform_worker_node_scaling(onenode)
+    # Collect scaling info for each node
+    scaling_method, scaling_info = get_node_scaling(onenode)
+    if scaling_method and scaling_info:
+      nodes_to_scale.setdefault(scaling_method, []).append(scaling_info)
     for attrname, attrvalue in alerts.iteritems():
       prom.alerts_remove(attrname)
+  # Scale nodes using scaling info    
+  for method, info in nodes_to_scale.iteritems():
+    method(info)
   for oneservice in policy.get('scaling',dict()).get('services',[]):
     service_name=oneservice.get('name')
     log.info('(I) Collecting inputs for service "{0}" starts'.format(service_name))
