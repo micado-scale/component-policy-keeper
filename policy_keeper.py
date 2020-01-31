@@ -53,15 +53,17 @@ def get_node_scaling(node):
   m_node_count = node.get('outputs',dict()).get('m_node_count')
   nodes_to_drop_list = node.get('outputs',dict()).get('m_nodes_todrop',list())
   cloud = get_cloud_orchestrator(node)
-  config = pk_config.config()
-  scaling_info = {'config': config, 'node_name': node['name']}
+  scaling_info = {'node_name': node['name']}
   if nodes_to_drop_list:
     for nodetodrop in nodes_to_drop_list:
-      if m_node_count>node['min_instances']:
-        log.debug('(S) Dropping node {0}...'.format(nodetodrop))
+      if m_node_count>node['min_instances']:        
+        # Collect the nodetodrop info
+        log.debug('(S) Plan to drop node {0}...'.format(nodetodrop))
         scaling_info.setdefault('replicas', []).append(nodetodrop)
         m_node_count-=1
     node['outputs']['m_node_count']=m_node_count
+
+    # Return the nodetodrop info along with the appropriate handler method
     return cloud.drop_worker_node, scaling_info
   elif 'm_node_count' in node.get('outputs',dict()):
     nodecount,nmin,nmax = limit_instances(
@@ -71,6 +73,8 @@ def get_node_scaling(node):
     log.debug('(S) Scaling values for {0}: min:{1} max:{2} calculated:{3} corrected:{4}'
              .format(node['name'],nmin,nmax,node['outputs'].get('m_node_count',None),nodecount))
     scaling_info['replicas'] = nodecount
+
+    # Return the nodecount info along with the appropriate handler method
     return cloud.scale_worker_node, scaling_info
   return None, None
 
@@ -134,6 +138,8 @@ def load_policy_from_file(policyfile):
     policy = f.read()
   return policy
 
+# Get the correct handler to use for each node operation
+# This info needs to be set by the PKadaptor
 def get_cloud_orchestrator(node):
   if node.get('orchestrator', '').lower() == 'terraform':
     return terra
@@ -181,7 +187,7 @@ def prepare_session(policy_yaml):
   log.info('(C) Notify prometheus to reload config starts')
   prom.notify_to_reload_config(config['prometheus_endpoint'])
   #Initialise nodes through Occopus
-  log.info('(C) Querying number of target nodes from Occopus starts')
+  log.info('(C) Querying number of target nodes from Cloud Orchestrator starts')
   #policy.setdefault('scaling', dict())["cloud_orchestrator"] = get
   for onenode in policy.get('scaling',dict()).get('nodes',[]):
     cloud = get_cloud_orchestrator(onenode)
@@ -325,6 +331,8 @@ def perform_one_session(policy, results = None):
   log.info('(M) Maintaining worker nodes starts')
   k8s.down_nodes_maintenance(config['k8s_endpoint'],config['docker_node_unreachable_timeout'])
   nodes_to_scale = dict()
+
+  # Nodes loop
   for onenode in policy.get('scaling',dict()).get('nodes',[]):
     node_name = onenode.get('name')
     log.info('(I) Collecting inputs for node {} starts'.format(node_name))
@@ -351,15 +359,19 @@ def perform_one_session(policy, results = None):
     log.info('(P) Policy evaluation for nodes starts')
     perform_policy_evaluation_on_worker_nodes(policy, onenode)
     log.info('(S) Scaling of nodes starts')
-    # Collect scaling info for each node
+
+    # First, collect orchestrator handler method and info for each node
     scaling_method, scaling_info = get_node_scaling(onenode)
     if scaling_method and scaling_info:
       nodes_to_scale.setdefault(scaling_method, []).append(scaling_info)
     for attrname, attrvalue in alerts.iteritems():
       prom.alerts_remove(attrname)
-  # Scale nodes using scaling info    
-  for method, info in nodes_to_scale.iteritems():
-    method(info)
+
+  # Then, scale nodes using the correct orchestrator and scaling info    
+  for handler_method, scaling_info in nodes_to_scale.iteritems():
+    handler_method(config, scaling_info)
+
+  # Containers loop
   for oneservice in policy.get('scaling',dict()).get('services',[]):
     service_name=oneservice.get('name')
     log.info('(I) Collecting inputs for service "{0}" starts'.format(service_name))

@@ -7,21 +7,14 @@ dryrun_id = 'occopus'
 CONFIG_ENDPOINT = 'occopus_endpoint'
 CONFIG_INFRA_NAME = 'occopus_infra_name'
 
-def get_scaling_values(info):
-  return (
-    info.get('config', {}).get(CONFIG_ENDPOINT), 
-    info.get('config', {}).get(CONFIG_INFRA_NAME), 
-    info.get('node_name'), 
-    info.get('replicas')
-  )
-
-def scale_worker_node(scaling_info_list):
+def scale_worker_node(config,scaling_info_list):
     log=logging.getLogger('pk_occopus')
     if pk_config.dryrun_get(dryrun_id):
       log.info('(S)   DRYRUN enabled. Skipping...')
       return
+    endpoint, infra_name = config[CONFIG_ENDPOINT], config[CONFIG_INFRA_NAME]
     for info in scaling_info_list:
-      endpoint, infra_name, worker_name, replicas = get_scaling_values(info)
+      worker_name, replicas = info.get('node_name'), info.get('replicas')
       log.info('(S) {0}  => m_node_count: {1}'.format(worker_name, replicas))
       wscall = '{0}/infrastructures/{1}/scaleto/{2}/{3}'.format(endpoint,infra_name,worker_name,replicas)
       log.debug('-->curl -X POST {0}'.format(wscall))
@@ -43,17 +36,19 @@ def query_number_of_worker_nodes(config,worker_name):
     log.debug('-->instances: {0}, response: {1}'.format(instances,response))
     return instances
 
-def drop_worker_node(scaling_info_list):
+def drop_worker_node(config,scaling_info_list):
     log=logging.getLogger('pk_occopus')
     if pk_config.dryrun_get(dryrun_id):
       log.info('(S)   DRYRUN enabled. Skipping...')
       return
+    endpoint, infra_name = config[CONFIG_ENDPOINT], config[CONFIG_INFRA_NAME]
     for info in scaling_info_list:
-      endpoint, infra_name, worker_name, replica = get_scaling_values(info)
-      log.info('(S) {0}  => node drop: {1}'.format(worker_name, replica))
-      wscall = '{0}/infrastructures/{1}/scaledown/{2}/{3}'.format(endpoint,infra_name,worker_name,replica)
-      log.debug('-->curl -X POST {0}'.format(wscall))
-      response = requests.post(wscall).json()
-      log.debug('-->response: {0}'.format(response))
+      worker_name, replicas = info.get('node_name'), info.get('replicas')
+      for replica in replicas:
+        log.info('(S) {0}  => node drop: {1}'.format(worker_name, replica))
+        wscall = '{0}/infrastructures/{1}/scaledown/{2}/{3}'.format(endpoint,infra_name,worker_name,replica)
+        log.debug('-->curl -X POST {0}'.format(wscall))
+        response = requests.post(wscall).json()
+        log.debug('-->response: {0}'.format(response))
     return
 
