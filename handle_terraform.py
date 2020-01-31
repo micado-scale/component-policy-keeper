@@ -42,7 +42,6 @@ def scale_worker_node(config, scaling_info_list):
     shell_command = "terraform apply --auto-approve"
     shell_command += LOG_SUFFIX
     exec_command = ["sh", "-c", shell_command]
-    log.debug("-->docker exec {}".format(exec_command))
 
     # Thread this action so PK can continue, Terraform has its own lock
     Thread(target=perform_scaling, args=(config, exec_command)).start()
@@ -109,11 +108,9 @@ def perform_scaling(config, command):
 
     # Run the command in the container
     terraform = get_terraform(container_name)
-    try:
-        exec_run = terraform.exec_run(command, workdir=terra_path)
-        log.debug("-->exit code {}".format(exec_run.exit_code))
-    except Exception:
-        log.error("Failed to scale {}")
+    exit_code, out = terraform.exec_run(command, workdir=terra_path)
+    if exit_code > 0:
+        log.debug("-->exit code {} -->msg {}".format(exit_code, out))
 
 
 def read_vars_file():
