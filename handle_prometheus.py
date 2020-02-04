@@ -21,22 +21,17 @@ def extract_value_from_prometheus_response(expression,response,filterdict=dict()
   if response['data']['resultType']=='vector':
     result = [ x for x in response['data']['result']
              if x.get('metric',None) is not None and is_subdict(filterdict,x['metric']) ]
-    if len(result)>1:
-      log.debug('Multiple results in prometheus response for expression "{0}": "{1}"'
-                .format(expression,str(result)))
-      if not isinstance(expression,list):
-        raise Exception('Multiple results in prometheus response for expression "{0}": "{1}"'
-                        .format(expression,str(result)))
-      else:
-        return [ x.get('metric',dict()).get(expression[1]) \
-                 for x in result if x.get('metric',dict()).get(expression[1])]
     if len(result)<1:
       raise Exception('No results found in prometheus response for expression "{0}": "{1}"'
                       .format(expression,str(result)))
-    if not result[0].get('value'):
-      raise Exception('Unrecognised result in prometheus response for expression "{0}": "{1}"'
-                      .format(expression,str(result[0])))
-    value=result[0]['value']
+    log.debug('Multiple results in prometheus response for expression "{0}": "{1}"'
+              .format(expression,str(result)))
+    if not isinstance(expression,list):
+      raise Exception('Multiple results in prometheus response for expression "{0}": "{1}"'
+                      .format(expression,str(result)))
+    else:
+      return [ x.get('metric',dict()).get(expression[1]) \
+               for x in result if x.get('metric',dict()).get(expression[1])]
   else:
     value=response['data']['result']
   if not isinstance(value,list) or \
