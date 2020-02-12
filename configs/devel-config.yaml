@@ -1,9 +1,9 @@
 
  
-prometheus_endpoint: 'http://localhost'
-prometheus_config_template: '/tmp/original_prometheus_config.yaml'
-prometheus_config_target: '/tmp/prometheus_config.yaml'
-prometheus_rules_directory: '/var/lib/micado/prometheus/config'
+prometheus_endpoint: 'http://prometheus:9090/prometheus'
+prometheus_config_template: '/config/policykeeper/prometheus_config_template.yaml'
+prometheus_config_target: '/prometheus.yaml'
+prometheus_rules_directory: '/'
 
 docker_node_unreachable_timeout: 120
 
