@@ -1,7 +1,8 @@
 import logging
 import json
 import time
-from threading import Thread
+import threading
+from itertools import izip_longest
 
 import docker
 
@@ -9,12 +10,11 @@ import pk_config
 
 dryrun_id = "terraform"
 
-# These fields should exist in PK's config.yaml
 CONFIG_CONTAINER_NAME = "terraform_container_name"
 CONFIG_PATH = "terraform_path"
 TF_VARS_PATH = "/submitter/terraform.tfvars.json"
 
-# Use this to log to the Terraform container
+# Append this to commands to log to the Terraform container
 LOG_SUFFIX = (
     " | while IFS= read -r line;"
     ' do printf "%s %s\n" "$(date "+[%Y-%m-%d %H:%M:%S]")" "$line";'
@@ -29,22 +29,25 @@ def scale_worker_node(config, scaling_info_list):
     if pk_config.dryrun_get(dryrun_id):
         log.info("(S)   DRYRUN enabled. Skipping...")
         return
-    counts = read_vars_file()
+    count_variables = _read_vars_file()
     for info in scaling_info_list:
         replicas = info.get("replicas")
         node = info.get("node_name")
         var_name = node + "-count"
-        counts[var_name] = replicas
+        count_variables[var_name] = replicas
         log.info("(S) {}  => m_node_count: {}".format(node, replicas))
-    write_vars_file(counts)
+    _write_vars_file(count_variables)
 
-    # Build the Terraform CLI command to execute with Docker
-    shell_command = "terraform apply --auto-approve"
-    shell_command += LOG_SUFFIX
+    # Build the Terraform CLI command
+    shell_command = "terraform apply --auto-approve" + LOG_SUFFIX
     exec_command = ["sh", "-c", shell_command]
 
-    # Thread this action so PK can continue, Terraform has its own lock
-    Thread(target=perform_scaling, args=(config, exec_command)).start()
+    # Thread this action so PK can continue
+    if _thread_not_active():
+        tf_thread = threading.Thread(
+            target=perform_scaling, args=(config, exec_command), name="TerraformThread"
+        )
+        tf_thread.start()
 
 
 def query_number_of_worker_nodes(config, worker_name):
@@ -53,7 +56,7 @@ def query_number_of_worker_nodes(config, worker_name):
         log.info("(C)   DRYRUN enabled. Skipping...")
         return instances
     try:
-        resources = get_resources_from_state(config, worker_name)
+        resources = _get_resources_from_state(config, worker_name)
         instances = len(resources[0]["instances"])
     except Exception:
         log.error("Failed to get no. of instances for {}".format(worker_name))
@@ -62,11 +65,35 @@ def query_number_of_worker_nodes(config, worker_name):
 
 
 def drop_worker_node(config, scaling_info_list):
-    # TODO drop specific worker
-    pass
+    destroy_targets = ""
+    for info in scaling_info_list:
+        ips_to_drop = info.get("replicas")
+        node_name = info.get("node_name")
+        if not ips_to_drop:
+            continue
 
+        ip_list = _get_ips_from_output(config, node_name)
 
-def get_terraform(container_name):
+        for target_ip in ips_to_drop:
+            target = _get_target_by_ip(ip_list, target_ip)
+            destroy_targets += "-target {} ".format(target)
+    destroy_targets.strip()
+
+    # Build the Terraform CLI command to execute with Docker
+    shell_command = "terraform destroy --auto-approve " + destroy_targets + LOG_SUFFIX
+    exec_command = ["sh", "-c", shell_command]
+
+    if _thread_not_active():
+        tf_thread = threading.Thread(
+            target=perform_scaling,
+            args=(config, exec_command),
+            kwargs={"lock_timeout": 300},
+            name="TerraformThread",
+        )
+        tf_thread.start()
+
+def get_terraform(config):
+    container_name = config.get(CONFIG_CONTAINER_NAME, "terraform")
     for i in range(1, 6):
         try:
             terraform = client.containers.list(
@@ -80,45 +107,65 @@ def get_terraform(container_name):
             time.sleep(5)
     log.error("Failed to get Terraform container")
 
-
-def get_resources_from_state(config, worker_name):
-    container_name = config.get(CONFIG_CONTAINER_NAME, "terraform")
+def perform_scaling(config, command, lock_timeout=0):
+    """ Execute the command in the terraform container """
+    terraform = get_terraform(config)
     terra_path = config.get(CONFIG_PATH)
 
-    terraform = get_terraform(container_name)
-    command = ["terraform", "state", "pull"]
+    while True:
+        exit_code, out = terraform.exec_run(command, workdir=terra_path)
+        if exit_code > 0:
+            log.error("Terraform exec failed {}".format(out))
+        elif lock_timeout > 0 and "Error locking state" in str(out):
+            time.sleep(5)
+            lock_timeout -= 5
+            log.debug("Waiting for lock, {}s until timeout".format(lock_timeout))
+        else:
+            break
 
-    # Parse Terraform's state file
+def _get_json_from_command(config, command):
+
+    terraform = get_terraform(config)
+    terra_path = config.get(CONFIG_PATH)
+
     out = terraform.exec_run(command, workdir=terra_path)
     if out.exit_code != 0 or not out.output:
-        log.error("Could not get Terraform state")
-    json_state = json.loads(out.output.decode())
+        log.error("Could not get json data")
+    return json.loads(out.output.decode())
 
+def _get_ips_from_output(config, node):
+    command = ["terraform", "output", "-json"]
+    ip_info = _get_json_from_command(config, command)
+    return ip_info[node]["value"]
+
+def _get_resources_from_state(config, worker_name):
     # Return the resource matching the given worker
+    command = ["terraform", "state", "pull"]
+    json_state = _get_json_from_command(config, command)
+
     resources = json_state.get("resources")
     resources = [x for x in resources if x.get("name") == worker_name]
     if not resources:
         log.error("No resources matching {}".format(worker_name))
     return resources
 
+def _get_target_by_ip(ip_list, ip_to_drop):
+    target = ip_list.get("target")
+    privates = ip_list.get("private_ips", [])
+    publics = ip_list.get("public_ips", [])
 
-def perform_scaling(config, command):
-    container_name = config.get(CONFIG_CONTAINER_NAME, "terraform")
-    terra_path = config.get(CONFIG_PATH)
+    for index, ips in izip_longest(privates, publics):
+        if ip_to_drop in ips:
+            return target + "[{}]".format(index)
 
-    # Run the command in the container
-    terraform = get_terraform(container_name)
-    exit_code, out = terraform.exec_run(command, workdir=terra_path)
-    if exit_code > 0:
-        log.debug("-->exit code {} -->msg {}".format(exit_code, out))
-
-
-def read_vars_file():
+def _read_vars_file():
     with open(TF_VARS_PATH, "r") as file:
         data = json.load(file)
     return data
 
-
-def write_vars_file(data):
+def _write_vars_file(data):
     with open(TF_VARS_PATH, "w") as file:
         json.dump(data, file, indent=4)
+
+def _thread_not_active():
+    return "TerraformThread" not in [x.name for x in threading.enumerate()]
