@@ -124,7 +124,7 @@ def perform_scaling(config):
     terraform = get_terraform(config)
     terra_path = config.get(CONFIG_PATH)
 
-    shell_command = "terraform apply --auto-approve" + LOG_SUFFIX
+    shell_command = "terraform apply -auto-approve -no-color" + LOG_SUFFIX
     command = ["sh", "-c", shell_command]
 
     exit_code, out = terraform.exec_run(command, workdir=terra_path)
