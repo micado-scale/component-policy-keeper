@@ -11,11 +11,11 @@ idna==2.8
 ipaddress==1.0.22
 itsdangerous==1.1.0
 Jinja2==2.10.1
-kubernetes==10.0.0
 MarkupSafe==1.1.1
 numpy==1.16.4
 post==2019.4.13
 public==2019.4.13
+pykube==0.15.0
 query-string==2019.4.13
 request==2019.4.13
 requests==2.22.0
