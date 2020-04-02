@@ -209,7 +209,7 @@ def _add_nodes(nodes, variance):
     Scale up by adding node(s) to the infrastructure 
     """
     if not nodes:
-        nodes.append("0")
+        nodes.append("1")
         variance -= 1
     for _ in range(variance):
         node_name = str(int(nodes[-1])+1)
