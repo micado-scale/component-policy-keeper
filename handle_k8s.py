@@ -1,12 +1,16 @@
-import kubernetes.client
-import kubernetes.config
 import logging
 import pk_config
 import time
 
+import pykube
+
 dryrun_id='k8s'
 MASTER = 'node-role.kubernetes.io/master'
-NOTREADY = 'node.kubernetes.io/unreachable'
+
+kube = pykube.HTTPClient(pykube.KubeConfig.from_file("/root/.kube/config"))
+
+class Deploymentv1(pykube.Deployment):
+  version = "apps/v1"
 
 def query_list_of_nodes(endpoint,worker_name='micado-worker',status='ready'):
   log=logging.getLogger('pk_k8s')
@@ -18,22 +22,30 @@ def query_list_of_nodes(endpoint,worker_name='micado-worker',status='ready'):
     a['Addr']='127.0.0.1'
     list_of_nodes.append(a.copy())
     return list_of_nodes
-  kubernetes.config.load_kube_config()
-  client = kubernetes.client.CoreV1Api()
+
   try:
-    nodes = [x for x in client.list_node().items if MASTER not in x.metadata.labels]
     if status=='ready':
-      nodes = [x for x in nodes if NOTREADY not in [y.key for y in x.spec.taints or []]]
-      nodes = [x for x in nodes if x.metadata.labels.get('micado.eu/node_type') == worker_name]
+      query = pykube.Node.objects(kube).filter(selector={"micado.eu/node_type__in": {worker_name}})
+      nodes = [x for x in query if "taints" not in x.obj["spec"]]
     elif status=='down':
-      nodes = [x for x in nodes if NOTREADY in [y.key for y in x.spec.taints or []]]
+      nodes = []
+      worker_nodes = [x for x in pykube.Node.objects(kube) if MASTER not in x.labels]
+      for node in worker_nodes:
+        ready_condition = [
+          x.iteritems()
+          for x in node.obj["status"]["conditions"]
+          if x.get("type") == "Ready"
+        ][0]
+        if ("status", "Unknown") in ready_condition:
+          nodes.append(node)
     for n in nodes:
       a = {}
-      a['ID']=n.metadata.name
-      a['Addr']=n.status.addresses[0].address
+      n.reload()
+      a['ID']=n.metadata["name"]
+      a['Addr']=n.obj["status"]["addresses"][0]["address"]
       list_of_nodes.append(a.copy())
     return list_of_nodes
-  except Exception as e:
+  except Exception:
     log.exception('(Q) Query of k8s nodes failed.')
     return dict()
 
@@ -44,12 +56,12 @@ def scale_k8s_deploy(endpoint,service_name,replicas):
   if pk_config.dryrun_get(dryrun_id):
     log.info('(S)   DRYRUN enabled. Skipping...')
     return
-  kubernetes.config.load_kube_config()
-  client = kubernetes.client.ExtensionsV1beta1Api()
+  
   try:
-    dep = client.read_namespaced_deployment(service_name, "default")
-    dep.spec.replicas = replicas
-    client.patch_namespaced_deployment_scale(service_name, "default", dep)
+    query = Deploymentv1.objects(kube).filter(field_selector={"metadata.name": service_name})
+    deployment = [x for x in query][0]
+    deployment.reload()
+    deployment.scale(replicas)
   except Exception as e:
     log.warning('(S) Scaling of k8s service "{0}" failed: {1}'.format(service_name,str(e)))
   return
@@ -61,12 +73,13 @@ def query_k8s_replicas(endpoint,service_name):
   if pk_config.dryrun_get(dryrun_id):
     log.info('(I)   DRYRUN enabled. Skipping...')
     return instance
-  kubernetes.config.load_kube_config()
-  client = kubernetes.client.ExtensionsV1beta1Api()
+
   try:
-    dep = client.read_namespaced_deployment(service_name, "default")
-    replicas = dep.spec.replicas
-    log.debug('(I)   => m_container_count for {0}: {1}'.format(service_name,replicas))
+    query = Deploymentv1.objects(kube).filter(field_selector={"metadata.name": service_name})
+    deployment = [x for x in query][0]
+    deployment.reload()
+    instance = deployment.replicas
+    log.debug('(I)   => m_container_count for {0}: {1}'.format(service_name,instance))
   except Exception as e:
     log.warning('(Q) Querying k8s service "{0}" replicas failed: {1}'.format(service_name,str(e)))
   return instance
@@ -78,16 +91,18 @@ def remove_node(endpoint,id):
   if pk_config.dryrun_get(dryrun_id):
     log.info('(M)   DRYRUN enabled. Skipping...')
     return
-  kubernetes.config.load_kube_config()
-  client = kubernetes.client.CoreV1Api()
+
   try:
-    client.delete_node(id)
+    query = pykube.Node.objects(kube).filter(field_selector={"metadata.name": id})
+    node = [x for x in query][0]
+    node.reload()
+    node.delete()
   except Exception:
     log.error('(M)   => Removing k8s node failed.')
   return
 
 def down_nodes_cleanup_by_list(stored, actual):
-  setStored = { v['ID'] for k,v in stored.items() }
+  setStored = { v['ID'] for k,v in stored.iteritems() }
   setActual = { x['ID'] for x in actual }
   missing = { x for x in setStored if x not in setActual }
   for x in missing:
@@ -102,7 +117,7 @@ def down_nodes_add_from_list(stored, actual):
 def down_nodes_cleanup_by_timeout(endpoint, stored, timeout):
   log=logging.getLogger('pk_k8s')
   current_time = int(time.time())
-  for id, node in stored.items():
+  for id, node in stored.iteritems():
     if node['micado_timestamp']+timeout < current_time:
       log.info('(M)   => Node {0} is down for more than {1} seconds, removing.'.format(id,timeout))
       remove_node(endpoint,id)

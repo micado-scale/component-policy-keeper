@@ -3,7 +3,7 @@ var_config = None
 var_policy = None
 var_finish_scaling = False
 var_dryrun = []
-var_dryrun_components = ['occopus','k8s','prometheus','optimizer']
+var_dryrun_components = ['occopus', 'terraform', 'k8s','prometheus','optimizer']
 
 def config(nc = None):
   global var_config
