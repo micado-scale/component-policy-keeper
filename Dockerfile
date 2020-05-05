@@ -1,4 +1,4 @@
-FROM python:2.7-slim
+FROM python:3.8-slim
 
 COPY . /policykeeper
 WORKDIR /policykeeper

@@ -168,7 +168,7 @@ for i in range(10000):
 x = 5
 """
     values_1 = evaluate(code_example_1, output_variables=['x', 'y'])
-    print("Example 1: Output variables: {}".format(values_1))
+    print(("Example 1: Output variables: {}".format(values_1)))
     assert values_1['x'] == 5, "x value should be 5"
     assert values_1['y'] == 49995000, "y value should be 49995000"
 
@@ -179,6 +179,6 @@ for i in range(101):
 """
     values_2 = evaluate(code_example_2, input_variables={'y': 10},
         output_variables=['y'])
-    print("Example 2: Output variables: {}".format(values_2))
+    print(("Example 2: Output variables: {}".format(values_2)))
     assert values_2['y'] == 5060, "y value should be 5060"
 

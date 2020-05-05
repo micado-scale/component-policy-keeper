@@ -8,7 +8,7 @@ echo "Reseting '$PDIR'"
 
 rm -rf "$PDIR"
 
-virtualenv "$PDIR"
+virtualenv -p python3 "$PDIR"
 source "$PDIR"/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt 

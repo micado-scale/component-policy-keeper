@@ -85,11 +85,11 @@ def perform_policy_evaluation_on_a_k8s_deploy(policy,service_name):
        continue
      inpvars = srv['inputs']
      inpvars['m_userdata'] = policy['scaling'].get('userdata',None)
-     for attrname, attrvalue in policy.get('data',dict()).get('query_results',dict()).iteritems():
+     for attrname, attrvalue in policy.get('data',dict()).get('query_results',dict()).items():
        inpvars[attrname]=attrvalue
-     for attrname, attrvalue in policy.get('data',dict()).get('alert_results',dict()).iteritems():
+     for attrname, attrvalue in policy.get('data',dict()).get('alert_results',dict()).items():
        inpvars[attrname]=attrvalue
-     for attrname, attrvalue in policy.get('data',dict()).get('constants',dict()).iteritems():
+     for attrname, attrvalue in policy.get('data',dict()).get('constants',dict()).items():
        inpvars[attrname]=attrvalue
      inpvars['requests']=requests
      if srv.get('scaling_rule','')!='':
@@ -105,11 +105,11 @@ def perform_policy_evaluation_on_worker_nodes(policy, node):
    inpvars = node['inputs']
    outvars = ['m_node_count','m_userdata','m_nodes_todrop']
    inpvars['m_userdata'] = policy['scaling'].get('userdata',None)
-   for attrname, attrvalue in policy.get('data',dict()).get('query_results',dict()).iteritems():
+   for attrname, attrvalue in policy.get('data',dict()).get('query_results',dict()).items():
      inpvars[attrname]=attrvalue
-   for attrname, attrvalue in policy.get('data',dict()).get('alert_results',dict()).iteritems():
+   for attrname, attrvalue in policy.get('data',dict()).get('alert_results',dict()).items():
      inpvars[attrname]=attrvalue
-   for attrname, attrvalue in policy.get('data',dict()).get('constants',dict()).iteritems():
+   for attrname, attrvalue in policy.get('data',dict()).get('constants',dict()).items():
      inpvars[attrname]=attrvalue
    inpvars['m_opt_advice']=optim.calling_rest_api_advice
    inpvars['requests']=requests
@@ -216,7 +216,7 @@ def add_query_results_and_alerts_to_nodes(policy, results, node):
   policy['data']['query_results']={}
   policy['data']['alert_results']={}
   scaling_rule_str = node.get('scaling_rule','')
-  for attrname, attrvalue in results.get('data',dict()).get('queries',dict()).iteritems():
+  for attrname, attrvalue in results.get('data',dict()).get('queries',dict()).items():
     if scaling_rule_str is not None and scaling_rule_str.find(attrname) != -1:
       queries[attrname]=attrvalue
       policy['data']['query_results'][attrname]=attrvalue
@@ -241,7 +241,7 @@ def add_query_results_and_alerts_to_service(policy, results, servicename):
   all_services = policy.get('scaling',dict()).get('services',dict())
   target_service = [ srv for srv in all_services if srv.get('name','')==servicename ]
   scaling_rule_str = target_service[0].get('scaling_rule','') if target_service else ''
-  for attrname,attrvalue in results.get('data',dict()).get('queries',dict()).iteritems():
+  for attrname,attrvalue in results.get('data',dict()).get('queries',dict()).items():
     if scaling_rule_str is not None and scaling_rule_str.find(attrname) != -1:
       queries[attrname]=attrvalue
       policy['data']['query_results'][attrname]=attrvalue
@@ -338,16 +338,16 @@ def perform_one_session(policy, results = None):
     log.info('(I) Collecting inputs for node {} starts'.format(node_name))
     inputs = collect_inputs_for_nodes(policy, onenode)
     set_policy_inputs_for_nodes(policy,inputs,onenode)
-    for x in inputs.keys():
+    for x in list(inputs.keys()):
       log.info('(I)   => "{0}": {1}'.format(x,inputs[x]))
     log.info('(Q) Evaluating queries and alerts for node {} starts'.format(node_name))
     if results:
       queries, alerts = add_query_results_and_alerts_to_nodes(policy, results, onenode)
     else:
       queries, alerts = prom.evaluate_data_queries_and_alerts_for_nodes(config['prometheus_endpoint'],policy, onenode)
-    for attrname, attrvalue in queries.iteritems():
+    for attrname, attrvalue in queries.items():
       log.info('(Q)   => "{0}" is "{1}".'.format(attrname,attrvalue))
-    for attrname, attrvalue in alerts.iteritems():
+    for attrname, attrvalue in alerts.items():
       log.info('(A)   => "{0}" is "{1}".'.format(attrname,attrvalue))
 
     if 'm_opt_advice' in onenode.get('scaling_rule',''):
@@ -364,11 +364,11 @@ def perform_one_session(policy, results = None):
     scaling_method, scaling_info = get_node_scaling(onenode)
     if scaling_method and scaling_info:
       nodes_to_scale.setdefault(scaling_method, []).append(scaling_info)
-    for attrname, attrvalue in alerts.iteritems():
+    for attrname, attrvalue in alerts.items():
       prom.alerts_remove(attrname)
 
   # Then, scale nodes using the correct orchestrator and scaling info    
-  for handler_method, scaling_info in nodes_to_scale.iteritems():
+  for handler_method, scaling_info in nodes_to_scale.items():
     handler_method(config, scaling_info)
 
   # Containers loop
@@ -377,7 +377,7 @@ def perform_one_session(policy, results = None):
     log.info('(I) Collecting inputs for service "{0}" starts'.format(service_name))
     inputs = collect_inputs_for_containers(policy,service_name)
     set_policy_inputs_for_containers(policy,service_name,inputs)
-    for x in inputs.keys():
+    for x in list(inputs.keys()):
       log.info('(I)   => "{0}": {1}'.format(x,inputs[x]))
     log.info('(Q) Evaluating queries and alerts for service "{0}" starts'.format(service_name))
     if results:
@@ -385,15 +385,15 @@ def perform_one_session(policy, results = None):
     else:
       queries, alerts = prom.evaluate_data_queries_and_alerts_for_a_service(
                              config['prometheus_endpoint'],policy,service_name)
-    for attrname, attrvalue in queries.iteritems():
+    for attrname, attrvalue in queries.items():
       log.info('(Q)   => "{0}" is "{1}".'.format(attrname,attrvalue))
-    for attrname, attrvalue in alerts.iteritems():
+    for attrname, attrvalue in alerts.items():
       log.info('(A)   => "{0}" is "{1}".'.format(attrname,attrvalue))
     log.info('(P) Policy evaluation for service "{0}" starts'.format(service_name))
     perform_policy_evaluation_on_a_k8s_deploy(policy,service_name)
     log.info('(S) Scaling of service "{0}" starts'.format(service_name))
     perform_service_scaling(policy,service_name)
-    for attrname, attrvalue in alerts.iteritems():
+    for attrname, attrvalue in alerts.items():
       prom.alerts_remove(attrname)
 
   log.info('--- session finished ---')
@@ -466,14 +466,14 @@ def pkmain():
     with open(args.cfg_path,'r') as c:
       pk_config.config(yaml.safe_load(c))
   except Exception as e:
-    print 'ERROR: Cannot read configuration file "{0}": {1}'.format(args.cfg_path,str(e))
+    print('ERROR: Cannot read configuration file "{0}": {1}'.format(args.cfg_path,str(e)))
   config = pk_config.config()
   #initialise logging facility based on the configuration
   try:
     logging.config.dictConfig(config['logging'])
     log = logging.getLogger('pk')
   except Exception as e:
-    print 'ERROR: Cannot process configuration file "{0}": {1}'.format(args.cfg_path,str(e))
+    print('ERROR: Cannot process configuration file "{0}": {1}'.format(args.cfg_path,str(e)))
   #read policy file and start periodic policy evaluation in case of command-line mode
   if not args.cfg_srv:
     if not args.cfg_policy:

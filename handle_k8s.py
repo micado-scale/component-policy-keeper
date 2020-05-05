@@ -32,7 +32,7 @@ def query_list_of_nodes(endpoint,worker_name='micado-worker',status='ready'):
       worker_nodes = [x for x in pykube.Node.objects(kube) if MASTER not in x.labels]
       for node in worker_nodes:
         ready_condition = [
-          x.iteritems()
+          iter(x.items())
           for x in node.obj["status"]["conditions"]
           if x.get("type") == "Ready"
         ][0]
@@ -102,7 +102,7 @@ def remove_node(endpoint,id):
   return
 
 def down_nodes_cleanup_by_list(stored, actual):
-  setStored = { v['ID'] for k,v in stored.iteritems() }
+  setStored = { v['ID'] for k,v in stored.items() }
   setActual = { x['ID'] for x in actual }
   missing = { x for x in setStored if x not in setActual }
   for x in missing:
@@ -117,7 +117,7 @@ def down_nodes_add_from_list(stored, actual):
 def down_nodes_cleanup_by_timeout(endpoint, stored, timeout):
   log=logging.getLogger('pk_k8s')
   current_time = int(time.time())
-  for id, node in stored.iteritems():
+  for id, node in stored.items():
     if node['micado_timestamp']+timeout < current_time:
       log.info('(M)   => Node {0} is down for more than {1} seconds, removing.'.format(id,timeout))
       remove_node(endpoint,id)
