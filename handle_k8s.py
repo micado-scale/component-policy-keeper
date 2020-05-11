@@ -10,10 +10,6 @@ MASTER = "node-role.kubernetes.io/master"
 kube = pykube.HTTPClient(pykube.KubeConfig.from_file("/root/.kube/config"))
 
 
-class Deploymentv1(pykube.Deployment):
-    version = "apps/v1"
-
-
 def query_list_of_nodes(endpoint, worker_name="micado-worker", status="ready"):
     log = logging.getLogger("pk_k8s")
     list_of_nodes = []
@@ -65,7 +61,7 @@ def scale_k8s_deploy(endpoint, service_name, replicas):
         return
 
     try:
-        query = Deploymentv1.objects(kube).filter(
+        query = pykube.Deployment.objects(kube).filter(
             field_selector={"metadata.name": service_name}
         )
         deployment = [x for x in query][0]
@@ -87,7 +83,7 @@ def query_k8s_replicas(endpoint, service_name):
         return instance
 
     try:
-        query = Deploymentv1.objects(kube).filter(
+        query = pykube.Deployment.objects(kube).filter(
             field_selector={"metadata.name": service_name}
         )
         deployment = [x for x in query][0]
