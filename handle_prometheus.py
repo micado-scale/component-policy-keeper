@@ -69,7 +69,7 @@ def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy,node):
           #TODO: handle dummy value more appropriately
           policy['data']['query_results'][param]=query
           queries[param]=query
-	else:
+        else:
           if isinstance(query,list):
             response = requests.get(endpoint+"/api/v1/query?query="+query[0]).json()
             log.debug('Prometheus response query "{0}":{1}'.format(query[0],response))
@@ -150,20 +150,20 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
       config_content['scrape_configs']=[]
     #Find proper scrape_config or create
     scrape_config = [ x for x in config_content['scrape_configs']
-		      if x.get('job_name','')=='micado' and 'static_configs' in x ]
+                    if x.get('job_name','')=='micado' and 'static_configs' in x ]
     if not scrape_config:
       config_content['scrape_configs'].append({'job_name': 'micado','static_configs':[]})
       scrape_config = [ x for x in config_content['scrape_configs']
-		      if x.get('job_name','')=='micado' and 'static_configs' in x ][0]
+                      if x.get('job_name','')=='micado' and 'static_configs' in x ][0]
     else:
       scrape_config = scrape_config[0]
     #Find proper static_config or create
     static_config = [ x for x in scrape_config['static_configs']
-		    if 'targets' in list(x.keys()) ]
+                    if 'targets' in list(x.keys()) ]
     if not static_config:
       scrape_config['static_configs'].append({'targets': []})
       static_config = [ x for x in scrape_config['static_configs']
-		      if 'targets' in list(x.keys()) ][0]
+                      if 'targets' in list(x.keys()) ][0]
     else:
       static_config = static_config[0]
 

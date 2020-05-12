@@ -43,7 +43,7 @@ def perform_service_scaling(policy,service_name):
   for srv in policy['scaling']['services']:
     if 'm_container_count' in srv.get('outputs',dict()) and srv['name']==service_name:
         log.debug('(S) Scaling values for service "{0}": min:{1} max:{2} calculated:{3}'
-		.format(srv['name'],srv['min_instances'],srv['max_instances'],srv['outputs']['m_container_count']))
+                 .format(srv['name'],srv['min_instances'],srv['max_instances'],srv['outputs']['m_container_count']))
         containercount = max(min(int(srv['outputs']['m_container_count']),int(srv['max_instances'])),int(srv['min_instances']))
         service_name = get_full_service_name(policy, srv['name'])
         config = pk_config.config()
