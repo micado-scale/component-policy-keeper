@@ -138,7 +138,7 @@ def down_nodes_add_from_list(stored, actual):
 def down_nodes_cleanup_by_timeout(endpoint, stored, timeout):
     log = logging.getLogger("pk_k8s")
     current_time = int(time.time())
-    for id, node in stored.items():
+    for id, node in list(stored.items())[:]:
         if node["micado_timestamp"] + timeout < current_time:
             log.info(
                 "(M)   => Node {0} is down for more than {1} seconds, removing.".format(
