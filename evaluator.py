@@ -36,8 +36,9 @@ def text_catcher(queue):
       log.info(str)
 
 class StdoutQueue(Queue):
-    def __init__(self,*args,**kwargs):
-        Queue.__init__(self,*args,**kwargs)
+    def __init__(self, *args, **kwargs):
+        context = multiprocessing.get_context()
+        super().__init__(*args, **kwargs, ctx=context)
 
     def write(self,msg):
         self.put(msg)
