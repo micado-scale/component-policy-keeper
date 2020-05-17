@@ -189,7 +189,7 @@ def calling_rest_api_init():
     m_opt_accessible = True
   except Exception as e:
     m_opt_accessible = False
-    log.exception('(O) Calling optimizer REST API init() method raised exception: ')
+    log.error('(O) Calling optimizer REST API init() method raised exception: ' + str(e))
     log.info('(O) WARNING: Optimizer is disabled for the current policy.')
     return
   log.debug('(O) Response: '+str(response))
