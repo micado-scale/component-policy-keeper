@@ -20,7 +20,7 @@ post==2019.4.13
 public==2019.4.13
 pyasn1==0.4.8
 pyasn1-modules==0.2.8
-pykube==0.15.0
+pykube-ng==20.5.0
 pytz==2020.1
 PyYAML==5.3.1
 query-string==2019.4.13
