@@ -1,0 +1,14 @@
+FROM python:3.8-alpine
+
+COPY requirements.txt /requirements.txt
+
+RUN apk add --no-cache --virtual .build-deps build-base \
+  && pip3 install -r /requirements.txt \
+  && rm -f /requirements.txt \
+  && rm -rf /root/.cache \
+  && apk del .build-deps
+
+COPY . /policykeeper
+WORKDIR /policykeeper
+
+CMD /policykeeper/policy_keeper.py --srv
