@@ -9,7 +9,7 @@ alerts = {}
 dryrun_id = 'prometheus'
 
 def is_subdict(subdict=dict(),maindict=dict()):
-  return all((k in maindict and maindict[k]==v) for k,v in subdict.iteritems())
+  return all((k in maindict and maindict[k]==v) for k,v in subdict.items())
 
 def extract_value_from_prometheus_response(expression,response,filterdict=dict()):
   log=logging.getLogger('pk_prometheus')
@@ -37,14 +37,14 @@ def extract_value_from_prometheus_response(expression,response,filterdict=dict()
     value=response['data']['result']
   if not isinstance(value,list) or \
     not isinstance(value[0],float) or \
-    not isinstance(value[1],basestring):
+    not isinstance(value[1],str):
       raise Exception('Unrecognised value in prometheus response for expression "{0}": "{1}"'
                       .format(expression,str(value)))
   return value[1]
 
 def filter_data_queries_by_scaling_rule(queries,scaling_rule):
   result=dict()
-  for param,query in queries.iteritems():
+  for param,query in queries.items():
     if scaling_rule.find(param)!= -1:
       result[param]=query
 
@@ -58,7 +58,7 @@ def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy,node):
   if 'query_results' not in policy['data']:
     policy['data']['query_results']=dict()
   scaling_rule_str = node.get('scaling_rule','')
-  for param,query in policy.get('data',dict()).get('queries',dict()).iteritems():
+  for param,query in policy.get('data',dict()).get('queries',dict()).items():
     try:
       if param.find('m_opt') != -1 or \
          (scaling_rule_str is not None and \
@@ -69,7 +69,7 @@ def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy,node):
           #TODO: handle dummy value more appropriately
           policy['data']['query_results'][param]=query
           queries[param]=query
-	else:
+        else:
           if isinstance(query,list):
             response = requests.get(endpoint+"/api/v1/query?query="+query[0]).json()
             log.debug('Prometheus response query "{0}":{1}'.format(query[0],response))
@@ -108,7 +108,7 @@ def evaluate_data_queries_and_alerts_for_a_service(endpoint,policy,servicename):
   all_services = policy.get('scaling',dict()).get('services',dict())
   target_service = [ srv for srv in all_services if srv.get('name','')==servicename ]
   scaling_rule_str = target_service[0].get('scaling_rule','') if target_service else ''
-  for param,query in policy.get('data',dict()).get('queries',dict()).iteritems():
+  for param,query in policy.get('data',dict()).get('queries',dict()).items():
     try:
       if scaling_rule_str is not None and scaling_rule_str.find(param) != -1:
         if pk_config.dryrun_get(dryrun_id):
@@ -150,20 +150,20 @@ def add_exporters_to_prometheus_config(policy, template_file, config_file):
       config_content['scrape_configs']=[]
     #Find proper scrape_config or create
     scrape_config = [ x for x in config_content['scrape_configs']
-		      if x.get('job_name','')=='micado' and 'static_configs' in x ]
+                    if x.get('job_name','')=='micado' and 'static_configs' in x ]
     if not scrape_config:
       config_content['scrape_configs'].append({'job_name': 'micado','static_configs':[]})
       scrape_config = [ x for x in config_content['scrape_configs']
-		      if x.get('job_name','')=='micado' and 'static_configs' in x ][0]
+                      if x.get('job_name','')=='micado' and 'static_configs' in x ][0]
     else:
       scrape_config = scrape_config[0]
     #Find proper static_config or create
     static_config = [ x for x in scrape_config['static_configs']
-		    if 'targets' in x.keys() ]
+                    if 'targets' in list(x.keys()) ]
     if not static_config:
       scrape_config['static_configs'].append({'targets': []})
       static_config = [ x for x in scrape_config['static_configs']
-		      if 'targets' in x.keys() ][0]
+                      if 'targets' in list(x.keys()) ][0]
     else:
       static_config = static_config[0]
 

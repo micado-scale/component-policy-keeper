@@ -148,20 +148,20 @@ def collect_init_params_and_variables(policy):
     return
   reset_variables()
   m_opt_init_params['constants'] = dict()
-  for varname,value in policy.get('data',dict()).get('constants',dict()).iteritems():
+  for varname,value in policy.get('data',dict()).get('constants',dict()).items():
     retvarname = varname_if_init(varname)
     if retvarname:
       log.info('(O)   => INIT: {0}:{1}'.format(retvarname,value))
       m_opt_init_params['constants'][retvarname]=value
   m_opt_init_params['constants']['input_metrics']=list()
-  for varname,query in policy.get('data',dict()).get('queries',dict()).iteritems():
+  for varname,query in policy.get('data',dict()).get('queries',dict()).items():
     retvarname = varname_if_input(varname)
     if retvarname:
       log.info('(O)   => INPUT: {0}:{1}'.format(retvarname,query))
       m_opt_init_params['constants']['input_metrics'].append(dict(name=retvarname))
       m_opt_variables.append(dict(lname=varname,sname=retvarname,query=query))
   m_opt_init_params['constants']['target_metrics']=list()
-  for varname,query in policy.get('data',dict()).get('queries',dict()).iteritems():
+  for varname,query in policy.get('data',dict()).get('queries',dict()).items():
     if check_if_target(varname):
       insert_target_structure(m_opt_init_params,varname,query)
   for onenode in policy.get('scaling',dict()).get('nodes',[]):
@@ -189,7 +189,7 @@ def calling_rest_api_init():
     m_opt_accessible = True
   except Exception as e:
     m_opt_accessible = False
-    log.exception('(O) Calling optimizer REST API init() method raised exception: ')
+    log.error('(O) Calling optimizer REST API init() method raised exception: ' + str(e))
     log.info('(O) WARNING: Optimizer is disabled for the current policy.')
     return
   log.debug('(O) Response: '+str(response))
@@ -214,7 +214,7 @@ def generate_sample(userqueries=dict(),sysqueries=dict()):
     onesample=dict()
     onesample['name']=var['sname']
     onesample['value']=None
-    for vname,vvalue in userqueries.iteritems():
+    for vname,vvalue in userqueries.items():
       if vname==var['lname']:
         onesample['value']=vvalue
     if onesample['value'] is not None:

@@ -2,7 +2,7 @@ import logging
 import json
 import time
 import threading
-from itertools import izip_longest
+from itertools import zip_longest
 
 import docker
 
@@ -177,7 +177,7 @@ def _get_target_by_ip(ip_list, ip_to_drop):
     privates = ip_list.get("private_ips", [])
     publics = ip_list.get("public_ips", [])
 
-    for index, ips in enumerate(izip_longest(privates, publics)):
+    for index, ips in enumerate(zip_longest(privates, publics)):
         if ip_to_drop in ips:
             return index
 
