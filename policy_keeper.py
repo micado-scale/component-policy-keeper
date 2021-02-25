@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import time, sys
 import requests
+import pykube
 from ruamel import yaml
 import json
 import shutil
@@ -92,6 +93,7 @@ def perform_policy_evaluation_on_a_k8s_deploy(policy,service_name):
      for attrname, attrvalue in policy.get('data',dict()).get('constants',dict()).items():
        inpvars[attrname]=attrvalue
      inpvars['requests']=requests
+     inpvars['pykube']=pykube
      if srv.get('scaling_rule','')!='':
        result = evaluator.evaluate(srv.get('scaling_rule',''), inpvars, outvars)
        if 'outputs' not in srv:
@@ -113,6 +115,7 @@ def perform_policy_evaluation_on_worker_nodes(policy, node):
      inpvars[attrname]=attrvalue
    inpvars['m_opt_advice']=optim.calling_rest_api_advice
    inpvars['requests']=requests
+   inpvars['pykube']=pykube
    if node.get('scaling_rule','')!='':
      result = evaluator.evaluate(node.get('scaling_rule',''), inpvars, outvars)
      if 'outputs' not in node:
