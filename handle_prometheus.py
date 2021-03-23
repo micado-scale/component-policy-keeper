@@ -85,7 +85,7 @@ def evaluate_data_queries_and_alerts_for_nodes(endpoint,policy,node):
     except Exception as e:
       policy['data']['query_results'][param]=None
       queries[param]=None
-      log.warning('Evaluating expression for query "{0}" failed: {1}'.format(param,e.message))
+      log.warning('Evaluating expression for query "{0}" failed: {1}'.format(param,e))
   policy['data']['alert_results']={}
   for item in policy.get('data',dict()).get('alerts',dict()):
     attrname = item['alert']
@@ -123,7 +123,7 @@ def evaluate_data_queries_and_alerts_for_a_service(endpoint,policy,servicename):
     except Exception as e:
       policy['data']['query_results'][param]=None
       queries[param]=None
-      log.warning('Evaluating expression for query "{0}" failed: {1}'.format(param,e.message))
+      log.warning('Evaluating expression for query "{0}" failed: {1}'.format(param,e))
   policy['data']['alert_results']={}
   for item in policy.get('data',dict()).get('alerts',dict()):
     attrname = item['alert']
