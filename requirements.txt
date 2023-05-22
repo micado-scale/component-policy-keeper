@@ -4,5 +4,5 @@ Flask==2.0.3
 Jinja2==3.0.0
 numpy==1.19.0
 pykube-ng==20.7.2
-requests==2.24.0
+requests==2.31.0
 ruamel.yaml==0.16.10
