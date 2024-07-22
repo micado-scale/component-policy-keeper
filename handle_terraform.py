@@ -3,14 +3,13 @@ import json
 import time
 import threading
 from itertools import zip_longest
-
-import docker
+from kube_terraform import KubeTerraform
 
 import pk_config
 
 dryrun_id = "terraform"
 
-CONFIG_CONTAINER_NAME = "terraform_container_name"
+CONFIG_POD_NAME = "terraform_container_name"
 CONFIG_PATH = "terraform_path"
 TF_VARS_PATH = "/submitter/terraform.tfvars.json"
 
@@ -22,7 +21,6 @@ LOG_SUFFIX = (
 )
 
 log = logging.getLogger("pk_terraform")
-client = docker.from_env()
 
 
 def scale_worker_node(config, scaling_info_list):
@@ -100,21 +98,17 @@ def drop_worker_node(config, scaling_info_list):
 
 def get_terraform(config):
     """
-    Return the Terraform container
+    Return the Terraform pod
     """
-    container_name = config.get(CONFIG_CONTAINER_NAME, "terraform")
+    deployment = config.get(CONFIG_POD_NAME, "terraform")
     for i in range(1, 6):
         try:
-            terraform = client.containers.list(
-                filters={
-                    "label": "io.kubernetes.container.name={}".format(container_name)
-                }
-            )[0]
+            terraform = KubeTerraform(deployment_name)
             return terraform
         except Exception as e:
             log.debug("Failed attempt {}/5 attaching to Terraform: {}".format(i, e))
             time.sleep(5)
-    log.error("Failed to get Terraform container")
+    log.error("Failed to get Terraform pod")
 
 
 def perform_scaling(config):
@@ -125,11 +119,8 @@ def perform_scaling(config):
     terra_path = config.get(CONFIG_PATH)
 
     shell_command = "terraform apply -auto-approve -no-color" + LOG_SUFFIX
-    command = ["sh", "-c", shell_command]
 
-    exit_code, out = terraform.exec_run(command, workdir=terra_path)
-    if exit_code > 0:
-        log.error("Terraform exec failed {}".format(out))
+    terraform.exec_run(shell_command)
 
 
 def _get_json_from_command(config, command):
