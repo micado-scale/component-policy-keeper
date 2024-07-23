@@ -8,12 +8,12 @@ api = core_v1_api.CoreV1Api()
 
 class KubeTerraform():
 
-    def __init__(deployment_name, namespace):
+    def __init__(self, deployment_name, namespace="micado-system"):
         """Initialise kubernetes sdk from kubeconfig"""
         self.deployment = deployment_name
         self.namespace = namespace
 
-    def _get_pod():
+    def _get_pod(self):
         """Get the pod from the deployment"""
         if not api:
             raise NameError("Kube API not initialised!")
@@ -27,16 +27,16 @@ class KubeTerraform():
             logger.error(f"Could not find {self.deployment} pod in {self.namespace}!")
             raise e from None
 
-    def exec_run(command, success=None):
+    def exec_run(self, command, success=None):
         """Exec a shell command in the pod, optionally check success"""
-        pod_name = _get_pod()
+        pod_name = self._get_pod()
         exec_command = ["/bin/sh", "-c"]
         exec_command.append(command)
         try:
             resp = stream(
                 api.connect_get_namespaced_pod_exec,
                 pod_name,
-                namespace,
+                self.namespace,
                 command=exec_command,
                 stderr=True,
                 stdin=False,
