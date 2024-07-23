@@ -103,7 +103,7 @@ def get_terraform(config):
     deployment = config.get(CONFIG_POD_NAME, "terraform")
     for i in range(1, 6):
         try:
-            terraform = KubeTerraform(deployment_name)
+            terraform = KubeTerraform(deployment)
             return terraform
         except Exception as e:
             log.debug("Failed attempt {}/5 attaching to Terraform: {}".format(i, e))
